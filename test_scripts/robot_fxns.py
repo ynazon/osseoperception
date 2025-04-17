@@ -49,7 +49,7 @@ def ma_filter(new_value,old_array):
 	old_array.append(new_value)
 	old_array.pop(0)
 	filtered_value = sum(old_array)/len(old_array)
-	return filtered_value 
+	return [filtered_value, old_array]
 
 def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajectory,trajectory_type):
 	x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
