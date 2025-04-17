@@ -12,6 +12,7 @@ import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 import gpiozero
 from rtplot import client
+import math
 # import numpy as np
 
 # Set pin numbering style
@@ -46,9 +47,9 @@ valve_pwm_pin = 18
 valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_value=0.5, frequency=pwm_freq)
 
 # Initialize Data Saving Variables
-test_time = 10.0 # In seconds
-name = 'pid_t4'
-date = '4_1_25'
+test_time = 2.0 # In seconds
+name = 'traj_test_2'
+date = '4_17_25'
 trial_name = name + '_' + date + '.xlsx'
 
 # Initialize Control Variables
@@ -57,19 +58,25 @@ loop_dt = 1.0/sampling_freq
 desired_force = 5.0 #in Newtons
 iterations = 0
 
-desired_force_vector = [desired_force]
-current_force_vector = [0.0]
-voltage_vector = [0.0]
+desired_force_vector = []#[desired_force]
+current_force_vector = []#[0.0]
+voltage_vector = []#[0.0]
 # sum_of_all_error_vector = [0.0]
 # loop_error = [0.0]
 # time_step = [0.0]
-control_effort_vector = [0.0]
-time_loop_start = [0.0]
+control_effort_vector = []#[0.0]
+time_loop_start = []#[0.0]
 differentiation_points = [0.0,0.0,0.0,0.0]
 
 previous_error = 0.0
 error_sum = 0.0
 error_derivative = 0.0
+
+# Create Control Trajectory
+traj_start = 0.0
+traj_end = 2*math.pi
+traj_type = 'sine'
+traj = robot.make_trajectory(traj_start,traj_end,sampling_freq,test_time,traj_type)
 
 # Control Robot
 try:
@@ -78,7 +85,8 @@ try:
     t_init = time.time()
 
     if question == '1':
-        while(time.time()-t_init < test_time):
+        # while(time.time()-t_init < test_time):
+        for value in traj:
             t1 = time.time() # get current time
             voltage = chan.voltage # read adc voltage
             
@@ -123,6 +131,7 @@ try:
     sheet1.write(0,2,'Actual Force')
     sheet1.write(0,3,'ADC Voltage')
     sheet1.write(0,4,'Control Effort')
+    sheet1.write(0,6,'Trajectory')
 
     sheet1.write(0,5,'Iterations')
     sheet1.write(1,5,iterations)
@@ -134,6 +143,7 @@ try:
         sheet1.write(i,2,current_force_vector[index])
         sheet1.write(i,3,voltage_vector[index])
         sheet1.write(i,4,control_effort_vector[index])
+        sheet1.write(i,6,traj[index])
         i = i+1
 
     book.close()
@@ -152,6 +162,7 @@ except KeyboardInterrupt:
     sheet1.write(0,2,'Actual Force')
     sheet1.write(0,3,'ADC Voltage')
     sheet1.write(0,4,'Control Effort')
+    sheet1.write(0,6,'Trajectory')
 
     sheet1.write(0,5,'Iterations')
     sheet1.write(1,5,iterations)
@@ -163,6 +174,7 @@ except KeyboardInterrupt:
         sheet1.write(i,2,current_force_vector[index])
         sheet1.write(i,3,voltage_vector[index])
         sheet1.write(i,4,control_effort_vector[index])
+        sheet1.write(i,6,traj[index])
         i = i+1
 
     book.close()

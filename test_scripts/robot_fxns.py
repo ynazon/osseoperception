@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-# # Import Packages
+# Import Packages
 # import gpiozero
+import numpy as np
+import math
 
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
 	# Constants
@@ -42,6 +44,21 @@ def PID_control(desired_force,current_force,previous_error,error_over_time,error
 	previous_error = current_error
 		
 	return [u, previous_error, kp_term, ki_term , kd_term, error_over_time, error_derivative, estimation_pts]
+
+def ma_filter(new_value,old_array):
+	old_array.append(new_value)
+	old_array.pop(0)
+	filtered_value = sum(old_array)/len(old_array)
+	return filtered_value 
+
+def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajectory,trajectory_type):
+	x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
+	if trajectory_type == 'sine':
+		trajectory = np.sin(x)
+	else:
+		trajectory = x
+	return trajectory
+
 
 # def robot_cleanup(pwm_pin,pwm_freq):
 # 	valve_pwm = gpiozero.PWMOutputDevice(pwm_pin, active_high=False, initial_value=0.5, frequency=pwm_freq)
