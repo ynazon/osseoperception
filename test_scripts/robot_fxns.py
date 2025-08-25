@@ -3,15 +3,20 @@
 # Import Packages
 # import gpiozero
 import numpy as np
+from scipy.signal import butter, lfilter, filtfilt
 import math
+import time
+import busio
+import adafruit_ads1x15.ads1015 as ADS
+from adafruit_ads1x15.analog_in import AnalogIn
 
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
 	# Constants
-	max_control_effort = 1000
+	max_control_effort = 2000
 	scaling_factor = -0.5
-	kp = 150.0 # 0.05, bi:7, uni: 1.8,150,90
-	ki = 0.0 # 0.6, uni: 15.0, 450, 8.0
-	kd = 0.65 # uni: 0.6
+	kp = 200.0 # 850, 1050
+	ki = 0.0 #
+	kd = 0.0 # 10 works
 	ped_gain = 0.0 # past error derivative gain term
 	ced_gain = 1.0 # current error derivative gain term
 	# Note: ced_gain + ped_gain = 1.0
@@ -53,7 +58,7 @@ def PID_control(desired_force,current_force,previous_error,error_over_time,error
 
 	previous_error = current_error
 		
-	return [u, previous_error, kp_term, ki_term , kd_term, error_over_time, error_derivative, estimation_pts]
+	return [u, previous_error, kp, ki, kd, kp_term, ki_term , kd_term, error_over_time, error_derivative, estimation_pts]
 
 def ma_filter(new_value,old_array):
 	old_array.append(new_value)
@@ -62,12 +67,16 @@ def ma_filter(new_value,old_array):
 	return [filtered_value, old_array]
 
 def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajectory,trajectory_type):
-	x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
 	if trajectory_type == 'sine':
-		trajectory = np.sin(x)
+		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
+		scaling_term = 5 # in Nm
+		frequency = 1 # in Hz
+		omega = (1.0/frequency) * 2 * math.pi # in Rad/s
+		offset = 0 # in Nm
+		trajectory = scaling_term* np.sin(omega*x) + offset
 	elif trajectory_type == 'traj':
 		trajectory = []
-		application_interval = 0.5 # t0 in seconds, 2 sec
+		application_interval = 10 # t0 in seconds, 2 sec
 		rest_interval = 1.5*application_interval # in seconds
 		force_levels = [5,10,15,20] # in Newtons
 		ramp_sizes = [1/4,1/2,3/4,1]
@@ -78,9 +87,59 @@ def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajector
 			zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*rest_interval))
 			trajectory_cycle = np.concatenate((ramp_up,hold,ramp_down,zero_hold))
 			trajectory = np.concatenate((trajectory,trajectory_cycle))
+	elif trajectory_type == 'fgwn':
+		# Create Gaussian Noise signal
+		number_of_samples = math.floor(time_length_of_trajectory * sampling_freq)
+		mean = 0
+		std_dev = 1
+		scaling_term = 5 # in Nm
+		gaussian_noise = np.random.normal(loc=mean, scale=std_dev, size=int(number_of_samples)) # Gaussian Noise
+				
+		# Filter Signal
+		cutoff_freq = 20.0 # Cutoff frequency (Hz)
+		nyquist_freq = 0.5*sampling_freq # Nyquist Frequency
+		normalized_cutoff = cutoff_freq/nyquist_freq
+		order = 4
+
+		# Get the filter coefficients
+		[b,a] = butter(order, normalized_cutoff, btype='low', analog=False)
+
+		# Apply the Filter
+		fgwn = lfilter(b, a, gaussian_noise) # Apply lowpass filter
+		
+		# Normalize & Scale Gaussian Noise Signal
+		max_value  = abs(max(fgwn, key=abs))
+		norm_n_scaled_signal = []
+		for i in range(len(fgwn)):
+			norm_n_scaled_signal.append(scaling_term*(fgwn[i]/max_value))
+
+		trajectory = np.array(norm_n_scaled_signal)
+		
 	else:
+		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
 		trajectory = x
 	return trajectory
+
+def load_cell_zero():
+	# Initialize ADC
+	scl_pin = 3
+	sda_pin = 2
+	i2c = busio.I2C(scl_pin, sda_pin)
+	ads = ADS.ADS1015(i2c)
+	ads.gain = 2/3 # Set adc max value to 6.144 V
+	chan = AnalogIn(ads, ADS.P0) # Create single-ended input on channel 0
+
+	read_time = 1 # in seconds
+	load_cell_voltage = []
+	t_init = time.time()
+
+	while (time.time() - t_init < read_time):
+		load_cell_voltage.append(chan.voltage)
+
+	avg_voltage = sum(load_cell_voltage)/len(load_cell_voltage)
+	force_offset = 148.26*avg_voltage - 391.9
+	return force_offset
+		
 
 # def robot_cleanup(pwm_pin,pwm_freq):
 # 	valve_pwm = gpiozero.PWMOutputDevice(pwm_pin, active_high=False, initial_value=0.5, frequency=pwm_freq)
