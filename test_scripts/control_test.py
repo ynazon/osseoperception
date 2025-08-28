@@ -52,18 +52,18 @@ valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_va
 
 # Initialize Data Saving Variables
 testing_flag = True
-test_time = 3.0 # In seconds
-name = 'lab_test'
-date = '8_25_25'
+test_time = 5.0 # In seconds
+name = 'md_t1'
+date = '8_26_25'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/8_25_25/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/8_26_25/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
 sampling_freq = 250.0 # In Hz
 loop_dt = 1.0/sampling_freq
-desired_force = 10.0 #in Newtons
+desired_force = 5.0 #in Newtons
 iterations = 0
 
 desired_force_vector = []#[desired_force]
@@ -92,11 +92,14 @@ traj = robot.make_trajectory(traj_start,traj_end,sampling_freq,test_time,traj_ty
 
 # Control Robot
 try:
+    valve_pwm.value = 0.5
+    time.sleep(1.0)
     # Give input command to start script
     question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses.')
     
     # Get load cell offset
-    force_offset = robot.load_cell_zero()
+    # force_offset = robot.load_cell_zero()
+    force_offset = 0.0
     
     # Initialize loop time
     t_init = time.time()

@@ -14,7 +14,7 @@ def PID_control(desired_force,current_force,previous_error,error_over_time,error
 	# Constants
 	max_control_effort = 2000
 	scaling_factor = -0.5
-	kp = 200.0 # 850, 1050
+	kp = 50.0 # 850, 1050
 	ki = 0.0 #
 	kd = 0.0 # 10 works
 	ped_gain = 0.0 # past error derivative gain term
