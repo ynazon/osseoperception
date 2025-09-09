@@ -42,28 +42,28 @@ ads.gain = 2/3 # Set adc max value to 6.144 V
 chan = AnalogIn(ads, ADS.P0) # Create single-ended input on channel 0
 
 # Initialize PWM
-pwm_freq = 1000.0
+pwm_freq = 5000.0
 valve_pwm_pin = 18
-valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_value=0.5, frequency=pwm_freq)
+valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_value=1.0, frequency=pwm_freq)
 
 # pressure_pwm_freq = 500.0
 # pressure_pwm_pin = 13
 # pressure_pwm = gpiozero.PWMOutputDevice(pressure_pwm_pin, active_high=True, initial_value=0.99, frequency=pressure_pwm_freq)
 
 # Initialize Data Saving Variables
-testing_flag = True
+testing_flag = False
 test_time = 5.0 # In seconds
-name = 'md_t1'
-date = '8_26_25'
+name = 'tf_test_full_traj_t1'
+date = '9_9_25'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/8_26_25/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/9_9_25/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
 sampling_freq = 250.0 # In Hz
 loop_dt = 1.0/sampling_freq
-desired_force = 5.0 #in Newtons
+desired_force = 20.0 #in Newtons
 iterations = 0
 
 desired_force_vector = []#[desired_force]
@@ -87,13 +87,13 @@ error_derivative = 0.0
 # Create Control Trajectory
 traj_start = 0.0
 traj_end = 0.0 #2*math.pi
-traj_type = 'traj' # 'fgwn' # 'traj'
+traj_type = 'traj' # 'fgwn' # 'sine'
 traj = robot.make_trajectory(traj_start,traj_end,sampling_freq,test_time,traj_type)
 
 # Control Robot
 try:
-    valve_pwm.value = 0.5
-    time.sleep(1.0)
+    # valve_pwm.value = 0.5
+    # time.sleep(1.0)
     # Give input command to start script
     question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses.')
     
@@ -285,7 +285,6 @@ except KeyboardInterrupt:
     sheet1.write(1,11,kd)
 
     i = 1
-    final_traj = traj.tolist()
     if testing_flag == True:
         for index in range(len(current_force_vector)):
             sheet1.write(i,0,time_loop_start[index])
@@ -298,6 +297,7 @@ except KeyboardInterrupt:
             sheet1.write(i,8,filtered_force_vector[index])
             i = i+1
     else:
+        final_traj = traj.tolist()
         for index in range(len(current_force_vector)):
             sheet1.write(i,0,time_loop_start[index])
             sheet1.write(i,1,desired_force_vector[index])

@@ -12,11 +12,11 @@ from adafruit_ads1x15.analog_in import AnalogIn
 
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
 	# Constants
-	max_control_effort = 2000
-	scaling_factor = -0.5
-	kp = 50.0 # 850, 1050
+	max_control_effort = 1000 #2000
+	scaling_factor = -1.0 #0.5
+	kp = 110.0 # 150
 	ki = 0.0 #
-	kd = 0.0 # 10 works
+	kd = 1.0 # 10 works
 	ped_gain = 0.0 # past error derivative gain term
 	ced_gain = 1.0 # current error derivative gain term
 	# Note: ced_gain + ped_gain = 1.0
@@ -51,10 +51,10 @@ def PID_control(desired_force,current_force,previous_error,error_over_time,error
 	# Normalize control effort
 	u = (u/max_control_effort)*scaling_factor
 
-	# if u > 0.5:
-	# 	u = 0.5
-	# elif u < -0.5:
-	# 	u = -0.5
+	if u > 0.5:
+		u = 0.5
+	elif u < -0.5:
+		u = -0.5
 
 	previous_error = current_error
 		
@@ -73,7 +73,7 @@ def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajector
 		frequency = 1 # in Hz
 		omega = (1.0/frequency) * 2 * math.pi # in Rad/s
 		offset = 0 # in Nm
-		trajectory = scaling_term* np.sin(omega*x) + offset
+		trajectory = scaling_term * np.sin(omega*x) + offset
 	elif trajectory_type == 'traj':
 		trajectory = []
 		application_interval = 10 # t0 in seconds, 2 sec
