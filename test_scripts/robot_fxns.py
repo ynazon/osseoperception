@@ -66,20 +66,34 @@ def ma_filter(new_value,old_array):
 	filtered_value = sum(old_array)/len(old_array)
 	return [filtered_value, old_array]
 
-def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajectory,trajectory_type):
+def make_trajectory(sampling_freq,trajectory_type):
 	if trajectory_type == 'sine':
+		start_value = 0.0
+		end_value = 2*math.pi
+		time_length_of_trajectory = 1.0 # in seconds
+
 		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
-		scaling_term = 5 # in Nm
-		frequency = 1 # in Hz
-		omega = (1.0/frequency) * 2 * math.pi # in Rad/s
-		offset = 0 # in Nm
-		trajectory = scaling_term * np.sin(omega*x) + offset
+		scaling_term = 1 # in Nm
+		frequency = 2 # in Hz
+		offset = 10 # in Nm
+		trajectory = scaling_term * np.sin(frequency*x) + offset
+
 	elif trajectory_type == 'traj':
-		trajectory = []
-		application_interval = 10 # t0 in seconds, 2 sec
+		start_value = 0.0
+		end_value = 0.0
+		time_length_of_trajectory = 1.0 # in seconds
+
+		application_interval = 10 # t0 in seconds, 10 sec
 		rest_interval = 1.5*application_interval # in seconds
 		force_levels = [5,10,15,20] # in Newtons
 		ramp_sizes = [1/4,1/2,3/4,1]
+
+		zero_addendum_time = 0.5 # time in seconds
+		zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
+		trajectory = []
+		# Add zero hold at the beginning of the trajectory
+		trajectory = np.concatenate((trajectory,zero_addendum))
+
 		for force in force_levels:
 			ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval*ramp_sizes[force_levels.index(force)]))
 			hold = np.linspace(force,force,num = math.floor(sampling_freq*application_interval))
@@ -87,9 +101,14 @@ def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajector
 			zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*rest_interval))
 			trajectory_cycle = np.concatenate((ramp_up,hold,ramp_down,zero_hold))
 			trajectory = np.concatenate((trajectory,trajectory_cycle))
+
 	elif trajectory_type == 'fgwn':
-		# Create Gaussian Noise signal
+		start_value = 0.0
+		end_value = 0.0
+		time_length_of_trajectory = 1.0 # in seconds
 		number_of_samples = math.floor(time_length_of_trajectory * sampling_freq)
+
+		# Create Gaussian Noise signal
 		mean = 0
 		std_dev = 1
 		scaling_term = 5 # in Nm
@@ -114,8 +133,72 @@ def make_trajectory(start_value,end_value,sampling_freq,time_length_of_trajector
 			norm_n_scaled_signal.append(scaling_term*(fgwn[i]/max_value))
 
 		trajectory = np.array(norm_n_scaled_signal)
+
+	elif trajectory_type == 'vibe_n_hold':
+		start_value = 0.0
+		end_value = 0.0
+		time_length_of_trajectory = 1.0 # in seconds
+		type_of_wave = 'full' # full or timed
+	
+		# Define sine wave parameters
+		scaling_term = 1.0 # in Nm
+		frequency = 0.1 # in Hz
+		offset = 10.0 # in Nm
+		if type_of_wave == 'full':
+			time_length_of_sine = 1.0/frequency #1.0 # in seconds
+			x = np.linspace(0.0,2*math.pi,num = math.floor(sampling_freq*time_length_of_sine))
+			sine_traj = scaling_term * np.sin(x) + offset
+		else:
+			time_length_of_sine = 1.0 # in seconds
+			x = np.linspace(0.0,2*math.pi,num = math.floor(sampling_freq*time_length_of_sine))
+			sine_traj = scaling_term * np.sin(frequency*x) + offset
+			
+		# Define hold parameters
+		time_length_of_hold = 0.6 # in seconds
+		x = np.linspace(offset,offset,num = math.floor(sampling_freq*time_length_of_hold))
+		hold_traj = x
+
+		# Combine sine & hold trajectories
+		number_of_vibration_and_hold_cycles = 1
+		trajectory = []
+
+		trajectory_cycle = np.concatenate((hold_traj,sine_traj))
+		for i in range(number_of_vibration_and_hold_cycles):
+			trajectory = np.concatenate((trajectory,trajectory_cycle))
 		
+	elif trajectory_type == 'on_off':
+		start_value = 0.0
+		end_value = 0.0
+		time_length_of_trajectory = 1.0 # in seconds
+
+		# Define "on" parameters
+		torque_hold = 10.0 # in Nm
+		time_length_of_hold = 0.6 # in seconds
+		x = np.linspace(torque_hold,torque_hold,num = math.floor(sampling_freq*time_length_of_hold))
+		on_hold_traj = x
+		
+		# Define "off" parameters
+		off_time_length_of_hold = 0.6 # in seconds
+		x = np.linspace(0.0,0.0,num = math.floor(sampling_freq*off_time_length_of_hold))
+		off_hold_traj = x
+
+		# Combine on & off trajectories
+		number_of_on_off_cycles = 3
+		zero_addendum_time = 0.5 # time in seconds
+		zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
+		trajectory = []
+
+		trajectory_cycle = np.concatenate((off_hold_traj,on_hold_traj))
+		for i in range(number_of_on_off_cycles):
+			trajectory = np.concatenate((trajectory,trajectory_cycle))
+
+		# Add zero hold at the end of the trajectory
+		trajectory = np.concatenate((trajectory,zero_addendum))
+
 	else:
+		start_value = 0.0
+		end_value = 0.0
+		time_length_of_trajectory = 1.0 # in seconds
 		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
 		trajectory = x
 	return trajectory

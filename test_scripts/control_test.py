@@ -13,25 +13,25 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import gpiozero
 from rtplot import client
 import math
-# import numpy as np
+import numpy as np
 
 # Set pin numbering style
 gpio.setmode(gpio.BOARD)
 
 # ### Initialize Real Time Plotting
 # # Step 1: Configure the IP address
-# client.configure_ip('192.168.1.101')
+# client.configure_ip('192.168.1.44')
 
 # # Step 2: Initialize the plots
 # # Initialize one plot with 1 traces
 # client.initialize_plots()
 
 # #Send 1000 datapoints
-# # for i in range(1000):
+# for i in range(1000):
 
-# #     # Step 3: Send the data
-# #     # Send the number 5 a thousand times
-# #     client.send_array([5])
+#     # Step 3: Send the data
+#     # Send the number 5 a thousand times
+#     client.send_array([5])
 
 # Initialize ADC
 scl_pin = 3
@@ -52,11 +52,11 @@ valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_va
 
 # Initialize Data Saving Variables
 testing_flag = False
-test_time = 5.0 # In seconds
-name = 'tf_test_full_traj_t1'
-date = '9_9_25'
+test_time = 1.0 # In seconds
+name = 'sine_test_v2_t6'
+date = '9_18_25'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/9_9_25/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/9_18_25/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
@@ -85,17 +85,16 @@ error_sum = 0.0
 error_derivative = 0.0
 
 # Create Control Trajectory
-traj_start = 0.0
-traj_end = 0.0 #2*math.pi
-traj_type = 'traj' # 'fgwn' # 'sine'
-traj = robot.make_trajectory(traj_start,traj_end,sampling_freq,test_time,traj_type)
+traj_type = 'vibe_n_hold' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine'
+traj = robot.make_trajectory(sampling_freq,traj_type)
 
 # Control Robot
 try:
     # valve_pwm.value = 0.5
     # time.sleep(1.0)
     # Give input command to start script
-    question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses.')
+    question = 0
+    question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
     
     # Get load cell offset
     # force_offset = robot.load_cell_zero()
@@ -257,59 +256,60 @@ except KeyboardInterrupt:
     # pressure_pwm.value = 0.0
     # pressure_pwm.close()
 
-    print('Writing Data\n')
+    if question == '1':
+        print('Writing Data\n')
 
-    # Save data as excel sheet
-    book = xlsxwriter.Workbook(file_save_path)
-    sheet1 = book.add_worksheet('Sheet 1')
-    sheet1.write(0,0,'Time Loop Start')
-    sheet1.write(0,1,'Desired Force')
-    sheet1.write(0,2,'Actual Force')
-    sheet1.write(0,3,'ADC Voltage')
-    sheet1.write(0,4,'Control Effort')
+        # Save data as excel sheet
+        book = xlsxwriter.Workbook(file_save_path)
+        sheet1 = book.add_worksheet('Sheet 1')
+        sheet1.write(0,0,'Time Loop Start')
+        sheet1.write(0,1,'Desired Force')
+        sheet1.write(0,2,'Actual Force')
+        sheet1.write(0,3,'ADC Voltage')
+        sheet1.write(0,4,'Control Effort')
 
-    sheet1.write(0,5,'Iterations')
-    sheet1.write(1,5,iterations)
+        sheet1.write(0,5,'Iterations')
+        sheet1.write(1,5,iterations)
 
-    sheet1.write(0,6,'Trajectory')
-    sheet1.write(0,7,'Filtered Voltage')
-    sheet1.write(0,8,'Filtered Force')
+        sheet1.write(0,6,'Trajectory')
+        sheet1.write(0,7,'Filtered Voltage')
+        sheet1.write(0,8,'Filtered Force')
 
-    sheet1.write(0,9,'kp')
-    sheet1.write(1,9,kp)
+        sheet1.write(0,9,'kp')
+        sheet1.write(1,9,kp)
 
-    sheet1.write(0,10,'ki')
-    sheet1.write(1,10,ki)
+        sheet1.write(0,10,'ki')
+        sheet1.write(1,10,ki)
 
-    sheet1.write(0,11,'kd')
-    sheet1.write(1,11,kd)
+        sheet1.write(0,11,'kd')
+        sheet1.write(1,11,kd)
 
-    i = 1
-    if testing_flag == True:
-        for index in range(len(current_force_vector)):
-            sheet1.write(i,0,time_loop_start[index])
-            sheet1.write(i,1,desired_force_vector[index])
-            sheet1.write(i,2,current_force_vector[index])
-            sheet1.write(i,3,voltage_vector[index])
-            sheet1.write(i,4,control_effort_vector[index])
-            sheet1.write(i,6,'N/A')
-            sheet1.write(i,7,filtered_voltage_vector[index])
-            sheet1.write(i,8,filtered_force_vector[index])
-            i = i+1
-    else:
-        final_traj = traj.tolist()
-        for index in range(len(current_force_vector)):
-            sheet1.write(i,0,time_loop_start[index])
-            sheet1.write(i,1,desired_force_vector[index])
-            sheet1.write(i,2,current_force_vector[index])
-            sheet1.write(i,3,voltage_vector[index])
-            sheet1.write(i,4,control_effort_vector[index])
-            sheet1.write(i,6,final_traj[index])
-            sheet1.write(i,7,filtered_voltage_vector[index])
-            sheet1.write(i,8,filtered_force_vector[index])
-            i = i+1
+        i = 1
+        if testing_flag == True:
+            for index in range(len(current_force_vector)):
+                sheet1.write(i,0,time_loop_start[index])
+                sheet1.write(i,1,desired_force_vector[index])
+                sheet1.write(i,2,current_force_vector[index])
+                sheet1.write(i,3,voltage_vector[index])
+                sheet1.write(i,4,control_effort_vector[index])
+                sheet1.write(i,6,'N/A')
+                sheet1.write(i,7,filtered_voltage_vector[index])
+                sheet1.write(i,8,filtered_force_vector[index])
+                i = i+1
+        else:
+            final_traj = traj.tolist()
+            for index in range(len(current_force_vector)):
+                sheet1.write(i,0,time_loop_start[index])
+                sheet1.write(i,1,desired_force_vector[index])
+                sheet1.write(i,2,current_force_vector[index])
+                sheet1.write(i,3,voltage_vector[index])
+                sheet1.write(i,4,control_effort_vector[index])
+                sheet1.write(i,6,final_traj[index])
+                sheet1.write(i,7,filtered_voltage_vector[index])
+                sheet1.write(i,8,filtered_force_vector[index])
+                i = i+1
 
-    book.close()
+        book.close()
 
     print('Script Stopped. You Hit Ctrl+C')
 
