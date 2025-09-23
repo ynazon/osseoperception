@@ -103,19 +103,23 @@ def make_trajectory(sampling_freq,trajectory_type):
 			trajectory = np.concatenate((trajectory,trajectory_cycle))
 
 	elif trajectory_type == 'fgwn':
-		start_value = 0.0
-		end_value = 0.0
-		time_length_of_trajectory = 1.0 # in seconds
+		time_length_of_trajectory = 60.0 # in seconds
+		scaling_term = 5 # in Nm
+		offset = 10 # in Nm
 		number_of_samples = math.floor(time_length_of_trajectory * sampling_freq)
 
 		# Create Gaussian Noise signal
-		mean = 0
+		mean = 0 # Dont change, should be 0 for signal
 		std_dev = 1
-		scaling_term = 5 # in Nm
 		gaussian_noise = np.random.normal(loc=mean, scale=std_dev, size=int(number_of_samples)) # Gaussian Noise
+
+		# Add zero hold at the beginning of the trajectory
+		zero_addendum_time = 0.5 # time in seconds
+		zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
+		gaussian_noise = np.concatenate((zero_addendum,gaussian_noise))
 				
 		# Filter Signal
-		cutoff_freq = 20.0 # Cutoff frequency (Hz)
+		cutoff_freq = 10.0 # Cutoff frequency (Hz)
 		nyquist_freq = 0.5*sampling_freq # Nyquist Frequency
 		normalized_cutoff = cutoff_freq/nyquist_freq
 		order = 4
@@ -130,7 +134,7 @@ def make_trajectory(sampling_freq,trajectory_type):
 		max_value  = abs(max(fgwn, key=abs))
 		norm_n_scaled_signal = []
 		for i in range(len(fgwn)):
-			norm_n_scaled_signal.append(scaling_term*(fgwn[i]/max_value))
+			norm_n_scaled_signal.append((scaling_term*(fgwn[i]/max_value)) + offset)
 
 		trajectory = np.array(norm_n_scaled_signal)
 
@@ -142,10 +146,10 @@ def make_trajectory(sampling_freq,trajectory_type):
 	
 		# Define sine wave parameters
 		scaling_term = 1.0 # in Nm
-		frequency = 0.1 # in Hz
+		frequency = 5.0 # in Hz
 		offset = 10.0 # in Nm
 		if type_of_wave == 'full':
-			time_length_of_sine = 1.0/frequency #1.0 # in seconds
+			time_length_of_sine = 1.0/frequency # in seconds
 			x = np.linspace(0.0,2*math.pi,num = math.floor(sampling_freq*time_length_of_sine))
 			sine_traj = scaling_term * np.sin(x) + offset
 		else:

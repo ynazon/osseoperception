@@ -6,7 +6,7 @@
 import xlsxwriter
 import robot_fxns as robot
 import time
-import RPi.GPIO as gpio
+# import RPi.GPIO as gpio
 import busio
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
@@ -15,16 +15,26 @@ from rtplot import client
 import math
 import numpy as np
 
-# Set pin numbering style
-gpio.setmode(gpio.BOARD)
 
-# ### Initialize Real Time Plotting
-# # Step 1: Configure the IP address
-# client.configure_ip('192.168.1.44')
+### Initialize Real Time Plotting
+# Step 1: Configure the IP address
+# ip = '192.168.1.44'
+# client.configure_ip(ip) #44
+# # client.local_plot()
 
-# # Step 2: Initialize the plots
-# # Initialize one plot with 1 traces
-# client.initialize_plots()
+# Step 2: Initialize the plots
+# Initialize one plot with 1 traces
+
+plot_config1 = {'names' : ['Force'],
+                'colors' : ['r'],
+                'line_style': [''],
+                'title' : "Robot Force",
+                'ylabel': "Output Force (N)",
+                'xlabel': "Time (s)",
+                'yrange': [-10,25]
+                }
+
+client.initialize_plots(plot_config1)
 
 # #Send 1000 datapoints
 # for i in range(1000):
@@ -32,6 +42,17 @@ gpio.setmode(gpio.BOARD)
 #     # Step 3: Send the data
 #     # Send the number 5 a thousand times
 #     client.send_array([5])
+
+
+
+# Initalize Start Pin
+start_pin = 17 # Pin 11 is GPIO 17
+input_pin = gpiozero.Button(start_pin, pull_up=False)
+
+# Configure stop pin to high
+stop_pin = 27 # Pin 13 is GPIO 27
+output_pin = gpiozero.LED(stop_pin)
+output_pin.on()
 
 # Initialize ADC
 scl_pin = 3
@@ -51,27 +72,24 @@ valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_va
 # pressure_pwm = gpiozero.PWMOutputDevice(pressure_pwm_pin, active_high=True, initial_value=0.99, frequency=pressure_pwm_freq)
 
 # Initialize Data Saving Variables
-testing_flag = False
-test_time = 1.0 # In seconds
-name = 'sine_test_v2_t6'
-date = '9_18_25'
+testing_flag = True
+test_time = 60.0 # In seconds
+name = 'input_test_t1'
+date = '9_23_25'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/9_18_25/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/9_23_25/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
 sampling_freq = 250.0 # In Hz
 loop_dt = 1.0/sampling_freq
-desired_force = 20.0 #in Newtons
+desired_force = 10.0 #in Newtons
 iterations = 0
 
 desired_force_vector = []#[desired_force]
 current_force_vector = []#[0.0]
 voltage_vector = []#[0.0]
-# sum_of_all_error_vector = [0.0]
-# loop_error = [0.0]
-# time_step = [0.0]
 control_effort_vector = []#[0.0]
 time_loop_start = []#[0.0]
 differentiation_points = [0.0,0.0,0.0,0.0]
@@ -85,16 +103,20 @@ error_sum = 0.0
 error_derivative = 0.0
 
 # Create Control Trajectory
-traj_type = 'vibe_n_hold' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine'
+traj_type = 'fgwn' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine'
 traj = robot.make_trajectory(sampling_freq,traj_type)
 
 # Control Robot
 try:
+    
+    while(input_pin.is_pressed == False):
+        pass
+
     # valve_pwm.value = 0.5
     # time.sleep(1.0)
     # Give input command to start script
-    question = 0
-    question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
+    question = '1'
+    # question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
     
     # Get load cell offset
     # force_offset = robot.load_cell_zero()
@@ -141,7 +163,7 @@ try:
                 traj.append(desired_force)
 
                 # Send data to plot
-                # client.send_array(current_force_vector[-1])
+                client.send_array([filtered_force])
 
                 # This while loop sets the sampling rate at sampling_freq
                 while (time.time()-t1 < loop_dt):
@@ -183,12 +205,15 @@ try:
                 
 
                 # Send data to plot
-                # client.send_array(current_force_vector[-1])
+                client.send_array([filtered_force])
 
                 # This while loop sets the sampling rate at sampling_freq
                 while (time.time()-t1 < loop_dt):
                     pass
 
+    # Configure stop pin to low
+    output_pin.off()
+    
     # Save data as excel sheet
     book = xlsxwriter.Workbook(file_save_path)
     sheet1 = book.add_worksheet('Sheet 1')
@@ -248,6 +273,9 @@ try:
     # pressure_pwm.value = 0.0
     # pressure_pwm.close()
 
+    output_pin.close()
+    input_pin.close()
+
 except KeyboardInterrupt:
     print('\nStopping PWM\n')
     valve_pwm.value = 0.5
@@ -255,6 +283,9 @@ except KeyboardInterrupt:
 
     # pressure_pwm.value = 0.0
     # pressure_pwm.close()
+
+    output_pin.close()
+    input_pin.close()
 
     if question == '1':
         print('Writing Data\n')
