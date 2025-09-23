@@ -25,9 +25,9 @@ import numpy as np
 # Step 2: Initialize the plots
 # Initialize one plot with 1 traces
 
-plot_config1 = {'names' : ['Force'],
-                'colors' : ['r'],
-                'line_style': [''],
+plot_config1 = {'names' : ['Actual Force','Desired Force'],
+                'colors' : ['r','b'],
+                'line_style': ['',''],
                 'title' : "Robot Force",
                 'ylabel': "Output Force (N)",
                 'xlabel': "Time (s)",
@@ -163,7 +163,7 @@ try:
                 traj.append(desired_force)
 
                 # Send data to plot
-                client.send_array([filtered_force])
+                client.send_array([filtered_force,desired_force])
 
                 # This while loop sets the sampling rate at sampling_freq
                 while (time.time()-t1 < loop_dt):
@@ -205,7 +205,7 @@ try:
                 
 
                 # Send data to plot
-                client.send_array([filtered_force])
+                client.send_array([filtered_force,desired_force])
 
                 # This while loop sets the sampling rate at sampling_freq
                 while (time.time()-t1 < loop_dt):
