@@ -14,6 +14,8 @@ import gpiozero
 from rtplot import client
 import math
 import numpy as np
+import serial
+import inputs
 
 
 ### Initialize Real Time Plotting
@@ -34,6 +36,15 @@ plot_config1 = {'names' : ['Actual Force','Desired Force'],
                 'yrange': [-10,25]
                 }
 
+
+plot_config2 = {'names' : ['Actual Force'],
+                'colors' : ['r'],
+                'line_style': [''],
+                'title' : "Robot Force",
+                'ylabel': "Output Force (N)",
+                'xlabel': "Time (s)"
+                }
+
 client.initialize_plots(plot_config1)
 
 # #Send 1000 datapoints
@@ -43,7 +54,17 @@ client.initialize_plots(plot_config1)
 #     # Send the number 5 a thousand times
 #     client.send_array([5])
 
+# Configure the serial port
+ser = serial.Serial(
+    port='/dev/ttyAMA0',  # or /dev/ttyAMA10, etc.
+    baudrate=115200,
+    parity=serial.PARITY_NONE,
+    stopbits=serial.STOPBITS_ONE,
+    bytesize=serial.EIGHTBITS,
+    timeout=1
+)
 
+received_data = ""
 
 # Initalize Start Pin
 start_pin = 17 # Pin 11 is GPIO 17
@@ -67,33 +88,34 @@ pwm_freq = 5000.0
 valve_pwm_pin = 18
 valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_value=1.0, frequency=pwm_freq)
 
-# pressure_pwm_freq = 500.0
-# pressure_pwm_pin = 13
-# pressure_pwm = gpiozero.PWMOutputDevice(pressure_pwm_pin, active_high=True, initial_value=0.99, frequency=pressure_pwm_freq)
+signal_pwm_freq = 1000.0
+signal_pwm_pin = 13
+signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_value=0.0, frequency=signal_pwm_freq)
 
 # Initialize Data Saving Variables
-testing_flag = True
-test_time = 60.0 # In seconds
-name = 'input_test_t1'
-date = '9_23_25'
+testing_flag = False
+test_time = 3.0 # In seconds
+name = 'bw_test_5N_offset_1N_amp_fgwn_t1'
+date = '12_19_25'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/9_23_25/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/12_19_25/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
 sampling_freq = 250.0 # In Hz
 loop_dt = 1.0/sampling_freq
-desired_force = 10.0 #in Newtons
+desired_force = 20.0 #in Newtons
 iterations = 0
 
-desired_force_vector = []#[desired_force]
-current_force_vector = []#[0.0]
-voltage_vector = []#[0.0]
-control_effort_vector = []#[0.0]
-time_loop_start = []#[0.0]
-differentiation_points = [0.0,0.0,0.0,0.0]
+desired_force_vector = []
+current_force_vector = []
+voltage_vector = []
+control_effort_vector = []
+time_loop_start = []
+# desired_trajectory_vector = []
 
+differentiation_points = [0.0,0.0,0.0,0.0]
 filter_points = [0.0,0.0,0.0,0.0]
 filtered_voltage_vector = []
 filtered_force_vector = []
@@ -108,12 +130,28 @@ traj = robot.make_trajectory(sampling_freq,traj_type)
 
 # Control Robot
 try:
-    
-    while(input_pin.is_pressed == False):
-        pass
+# --------------- Serial Comms Start ----------------
+    # received_data = ser.readline().decode('utf-8').strip()
 
-    # valve_pwm.value = 0.5
-    # time.sleep(1.0)
+    # while(received_data != 'w'):
+    #     received_data = ser.readline().decode('utf-8').strip()
+    #     print(f"Waiting to start. Received: {received_data}")
+    #     # pass
+
+# --------------- Keyboard Input Start ----------------
+    # print("Waiting to start. Press 'S' to start.")
+    # while received_data != 'KEY_S':
+    #     events = inputs.get_key()
+    #     for event in events:
+    #         if event.ev_type == 'Key':
+    #             if event.state == 1:  # Key pressed
+    #                 received_data = event.code
+    #                 print(f'Key {event.code} pressed')
+    #         else:
+    #             print("Waiting to start. Press 'S' to start.")
+
+# --------------- User Input Start ----------------
+
     # Give input command to start script
     question = '1'
     # question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
@@ -127,10 +165,11 @@ try:
     if question == '1':
         if testing_flag == True:
             traj = []
+            max_traj_value = desired_force
             while(time.time()-t_init < test_time):
-            # for value in traj:
                 t1 = time.time() # get current time
-                # pressure_pwm.value = 0.99 # Set constant max pressure
+                # normalized_traj_value = desired_force/max_traj_value
+                # signal_pwm.value = normalized_traj_value # Send desired trajectory as a pwm signal
                 voltage = chan.voltage # read adc voltage
                 [filtered_voltage,filter_points] = robot.ma_filter(voltage,filter_points)
                 
@@ -147,7 +186,7 @@ try:
                                                                                         error_sum,error_derivative,differentiation_points,loop_dt)
                 
                 # send control effort as a pwm signal
-                valve_pwm.value = control_effort + 0.5  #May have to scale/normalize btwnS 0 & 1
+                valve_pwm.value = control_effort + 0.5  #May have to scale/normalize btwn 0 & 1
 
                 # increase loop counter
                 iterations = iterations + 1
@@ -161,18 +200,26 @@ try:
                 filtered_voltage_vector.append(filtered_voltage)
                 filtered_force_vector.append(filtered_force)
                 traj.append(desired_force)
+                # desired_trajectory_vector.append(signal_pwm.value) # normalized_traj_value
 
                 # Send data to plot
                 client.send_array([filtered_force,desired_force])
+                # client.send_array([filtered_force])
+
+                # Send data to robot via serial
+                # data_to_send = str(desired_force) + '\n'
+                # ser.write(data_to_send.encode('utf-8'))
 
                 # This while loop sets the sampling rate at sampling_freq
                 while (time.time()-t1 < loop_dt):
                     pass
 
         else:
+            max_traj_value = max(traj)
             for desired_force in traj:
                 t1 = time.time() # get current time
-                # pressure_pwm.value = 0.99 # Set constant max pressure
+                normalized_traj_value = desired_force/max_traj_value
+                signal_pwm.value = normalized_traj_value # Send desired trajectory as a pwm signal
                 voltage = chan.voltage # read adc voltage
                 [filtered_voltage,filter_points] = robot.ma_filter(voltage,filter_points)
                 
@@ -202,17 +249,25 @@ try:
                 control_effort_vector.append(control_effort)
                 filtered_voltage_vector.append(filtered_voltage)
                 filtered_force_vector.append(filtered_force)
+                # desired_trajectory_vector.append(signal_pwm.value) # normalized_traj_value
                 
-
                 # Send data to plot
                 client.send_array([filtered_force,desired_force])
+
+                # # Send data to robot via serial
+                # data_to_send = str(desired_force) + '\n'
+                # ser.write(data_to_send.encode('utf-8'))
 
                 # This while loop sets the sampling rate at sampling_freq
                 while (time.time()-t1 < loop_dt):
                     pass
 
-    # Configure stop pin to low
-    output_pin.off()
+    # # Configure stop pin to low
+    # output_pin.off()
+
+    # # Send Stop Signal Through Serial
+    # data_to_send = 'w'
+    # ser.write(data_to_send.encode('utf-8'))
     
     # Save data as excel sheet
     book = xlsxwriter.Workbook(file_save_path)
@@ -239,6 +294,11 @@ try:
     sheet1.write(0,11,'kd')
     sheet1.write(1,11,kd)
 
+    sheet1.write(0,12,'Max Trajectory Value/Scaling Factor')
+    sheet1.write(1,12,max_traj_value)
+
+    # sheet1.write(0,13,'Normalized Desired Voltage Trajectory (0 to 1)')
+
     i = 1
     if testing_flag == True:
         for index in range(len(current_force_vector)):
@@ -250,6 +310,7 @@ try:
             sheet1.write(i,6,traj[index])
             sheet1.write(i,7,filtered_voltage_vector[index])
             sheet1.write(i,8,filtered_force_vector[index])
+            # sheet1.write(i,13,desired_trajectory_vector[index])
             i = i+1
     else:
         final_traj = traj.tolist()
@@ -262,6 +323,7 @@ try:
             sheet1.write(i,6,final_traj[index])
             sheet1.write(i,7,filtered_voltage_vector[index])
             sheet1.write(i,8,filtered_force_vector[index])
+            # sheet1.write(i,13,desired_trajectory_vector[index])
             i = i+1
 
     book.close()
@@ -270,8 +332,8 @@ try:
     valve_pwm.value = 0.5
     valve_pwm.close()
 
-    # pressure_pwm.value = 0.0
-    # pressure_pwm.close()
+    signal_pwm.value = 0.0
+    signal_pwm.close()
 
     output_pin.close()
     input_pin.close()
@@ -281,8 +343,8 @@ except KeyboardInterrupt:
     valve_pwm.value = 0.5
     valve_pwm.close()
 
-    # pressure_pwm.value = 0.0
-    # pressure_pwm.close()
+    signal_pwm.value = 0.0
+    signal_pwm.close()
 
     output_pin.close()
     input_pin.close()
@@ -315,6 +377,11 @@ except KeyboardInterrupt:
         sheet1.write(0,11,'kd')
         sheet1.write(1,11,kd)
 
+        sheet1.write(0,12,'Max Trajectory Value/Scaling Factor')
+        sheet1.write(1,12,max_traj_value)
+
+        # sheet1.write(0,13,'Normalized Desired Voltage Trajectory (0 to 1)')
+
         i = 1
         if testing_flag == True:
             for index in range(len(current_force_vector)):
@@ -326,6 +393,7 @@ except KeyboardInterrupt:
                 sheet1.write(i,6,'N/A')
                 sheet1.write(i,7,filtered_voltage_vector[index])
                 sheet1.write(i,8,filtered_force_vector[index])
+                # sheet1.write(i,13,desired_trajectory_vector[index])
                 i = i+1
         else:
             final_traj = traj.tolist()
@@ -338,6 +406,7 @@ except KeyboardInterrupt:
                 sheet1.write(i,6,final_traj[index])
                 sheet1.write(i,7,filtered_voltage_vector[index])
                 sheet1.write(i,8,filtered_force_vector[index])
+                # sheet1.write(i,13,desired_trajectory_vector[index])
                 i = i+1
 
         book.close()

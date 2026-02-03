@@ -12,11 +12,11 @@ from adafruit_ads1x15.analog_in import AnalogIn
 
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
 	# Constants
-	max_control_effort = 1000 #2000
+	max_control_effort = 1000 #2000 1000
 	scaling_factor = -1.0 #0.5
-	kp = 110.0 # 150
+	kp = 250.0 # 150 #110 is best 200
 	ki = 0.0 #
-	kd = 1.0 # 10 works
+	kd = 1.0 # 1.0 or 10.0 works
 	ped_gain = 0.0 # past error derivative gain term
 	ced_gain = 1.0 # current error derivative gain term
 	# Note: ced_gain + ped_gain = 1.0
@@ -74,23 +74,23 @@ def make_trajectory(sampling_freq,trajectory_type):
 
 		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
 		scaling_term = 1 # in Nm
-		frequency = 2 # in Hz
-		offset = 10 # in Nm
+		frequency = 1 # in Hz
+		offset = 5 # in Nm
 		trajectory = scaling_term * np.sin(frequency*x) + offset
 
 	elif trajectory_type == 'traj':
 		start_value = 0.0
 		end_value = 0.0
-		time_length_of_trajectory = 1.0 # in seconds
 
-		application_interval = 10 # t0 in seconds, 10 sec
+		application_interval = 5.0 # t0 in seconds, 10 sec
 		rest_interval = 1.5*application_interval # in seconds
 		force_levels = [5,10,15,20] # in Newtons
-		ramp_sizes = [1/4,1/2,3/4,1]
+		ramp_sizes = [1/4,1/2,3/4,1] # as a fraction of application interval
 
-		zero_addendum_time = 0.5 # time in seconds
+		zero_addendum_time = 1.0 # time in seconds
 		zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
 		trajectory = []
+		
 		# Add zero hold at the beginning of the trajectory
 		trajectory = np.concatenate((trajectory,zero_addendum))
 
@@ -104,8 +104,8 @@ def make_trajectory(sampling_freq,trajectory_type):
 
 	elif trajectory_type == 'fgwn':
 		time_length_of_trajectory = 60.0 # in seconds
-		scaling_term = 5 # in Nm
-		offset = 10 # in Nm
+		scaling_term = 1 # in Nm
+		offset = 5 # in Nm
 		number_of_samples = math.floor(time_length_of_trajectory * sampling_freq)
 
 		# Create Gaussian Noise signal
@@ -145,9 +145,9 @@ def make_trajectory(sampling_freq,trajectory_type):
 		type_of_wave = 'full' # full or timed
 	
 		# Define sine wave parameters
-		scaling_term = 1.0 # in Nm
-		frequency = 5.0 # in Hz
-		offset = 10.0 # in Nm
+		scaling_term = 5.0 # in Nm
+		frequency = 0.1 # in Hz
+		offset = 5.0 # in Nm
 		if type_of_wave == 'full':
 			time_length_of_sine = 1.0/frequency # in seconds
 			x = np.linspace(0.0,2*math.pi,num = math.floor(sampling_freq*time_length_of_sine))
