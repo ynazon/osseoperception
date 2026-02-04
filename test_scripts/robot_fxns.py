@@ -13,9 +13,9 @@ from adafruit_ads1x15.analog_in import AnalogIn
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
 	# Constants
 	max_control_effort = 1000 #2000 1000
-	scaling_factor = -1.0 #0.5
-	kp = 250.0 # 150 #110 is best 200
-	ki = 0.0 #
+	scaling_factor = -1.0 #-0.5
+	kp = 150.0 # 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
+	ki = 100.0 # 100
 	kd = 1.0 # 1.0 or 10.0 works
 	ped_gain = 0.0 # past error derivative gain term
 	ced_gain = 1.0 # current error derivative gain term
@@ -65,6 +65,12 @@ def ma_filter(new_value,old_array):
 	old_array.pop(0)
 	filtered_value = sum(old_array)/len(old_array)
 	return [filtered_value, old_array]
+
+
+def realtime_lowpass_filter(x, b, a, zi):
+    y, zi = lfilter(b, a, [x], zi=zi)
+    return y[0], zi
+
 
 def make_trajectory(sampling_freq,trajectory_type):
 	if trajectory_type == 'sine':
@@ -173,22 +179,22 @@ def make_trajectory(sampling_freq,trajectory_type):
 	elif trajectory_type == 'on_off':
 		start_value = 0.0
 		end_value = 0.0
-		time_length_of_trajectory = 1.0 # in seconds
+		# time_length_of_trajectory = 1.0 # in seconds
 
 		# Define "on" parameters
-		torque_hold = 10.0 # in Nm
-		time_length_of_hold = 0.6 # in seconds
+		torque_hold = 15.0 # in Nm
+		time_length_of_hold = 2.0 # in seconds
 		x = np.linspace(torque_hold,torque_hold,num = math.floor(sampling_freq*time_length_of_hold))
 		on_hold_traj = x
 		
 		# Define "off" parameters
-		off_time_length_of_hold = 0.6 # in seconds
+		off_time_length_of_hold = 3.0 # in seconds
 		x = np.linspace(0.0,0.0,num = math.floor(sampling_freq*off_time_length_of_hold))
 		off_hold_traj = x
 
 		# Combine on & off trajectories
-		number_of_on_off_cycles = 3
-		zero_addendum_time = 0.5 # time in seconds
+		number_of_on_off_cycles = 1
+		zero_addendum_time = 0.0 # time in seconds
 		zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
 		trajectory = []
 
@@ -199,12 +205,27 @@ def make_trajectory(sampling_freq,trajectory_type):
 		# Add zero hold at the end of the trajectory
 		trajectory = np.concatenate((trajectory,zero_addendum))
 
+	elif trajectory_type == 'step':
+		# Define step parameters
+		desired_step = 20.0 # in Nm
+		time_length_of_step = 5.0 # in seconds
+		x = np.linspace(desired_step,desired_step,num = math.floor(sampling_freq*time_length_of_step))
+		on_hold_traj = x
+		
+		# Define "zero hold" parameters
+		off_time_length_of_hold = 3.0 # time of 0N hold before step in seconds
+		x = np.linspace(0.0,0.0,num = math.floor(sampling_freq*off_time_length_of_hold))
+		off_hold_traj = x
+
+		trajectory = np.concatenate((off_hold_traj,on_hold_traj))
+
 	else:
 		start_value = 0.0
 		end_value = 0.0
 		time_length_of_trajectory = 1.0 # in seconds
 		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
 		trajectory = x
+
 	return trajectory
 
 def load_cell_zero():
