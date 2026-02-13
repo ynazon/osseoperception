@@ -96,10 +96,10 @@ signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_
 # Initialize Data Saving Variables
 testing_flag = False
 test_time = 5.0 # In seconds
-name = 'hand_test_20N_final_t2'
-date = '2_3_26'
+name = 'vibe_n_hold_test_t3_70psi' # 'sine_freq_1hz_amp_15nm_t1'
+date = '2_9_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/2_3_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/2_9_26/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
@@ -126,7 +126,7 @@ error_sum = 0.0
 error_derivative = 0.0
 
 # Create Control Trajectory
-traj_type = 'step' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step'
+traj_type = 'vibe_n_hold' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step'
 traj = robot.make_trajectory(sampling_freq,traj_type)
 
 # Create lowpass filter
@@ -233,8 +233,8 @@ try:
             max_traj_value = max(traj)
             for desired_force in traj:
                 t1 = time.time() # get current time
-                normalized_traj_value = desired_force/max_traj_value
-                signal_pwm.value = normalized_traj_value # Send desired trajectory as a pwm signal
+                # normalized_traj_value = desired_force/max_traj_value
+                # signal_pwm.value = normalized_traj_value # Send desired trajectory as a pwm signal
                 voltage = chan.voltage # read adc voltage
                 filtered_voltage, zi = robot.realtime_lowpass_filter(voltage, b, a, zi)
                 # [filtered_voltage,filter_points] = robot.ma_filter(voltage,filter_points)
