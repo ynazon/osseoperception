@@ -96,10 +96,10 @@ signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_
 # Initialize Data Saving Variables
 testing_flag = False
 test_time = 5.0 # In seconds
-name = 'vibe_n_hold_test_t3_70psi' # 'sine_freq_1hz_amp_15nm_t1'
-date = '2_9_26'
+name = 'traj_test_t3' # 'sine_freq_1hz_amp_15nm_t1'
+date = '2_13_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/2_9_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/2_13_26/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
@@ -126,7 +126,7 @@ error_sum = 0.0
 error_derivative = 0.0
 
 # Create Control Trajectory
-traj_type = 'vibe_n_hold' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step'
+traj_type = 'block_burst_traj' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step' # 'block_burst_traj'
 traj = robot.make_trajectory(sampling_freq,traj_type)
 
 # Create lowpass filter
@@ -152,6 +152,8 @@ try:
     #     print(f"Waiting to start. Received: {received_data}")
     #     # pass
 
+    # question = '1'
+
 # --------------- Keyboard Input Start ----------------
     # print("Waiting to start. Press 'S' to start.")
     # while received_data != 'KEY_S':
@@ -161,14 +163,19 @@ try:
     #             if event.state == 1:  # Key pressed
     #                 received_data = event.code
     #                 print(f'Key {event.code} pressed')
+    #                 question = '1'
     #         else:
     #             print("Waiting to start. Press 'S' to start.")
 
 # --------------- User Input Start ----------------
 
     # Give input command to start script
-    question = '1'
     # question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
+
+# ----------------- Automatic Start ------------------------- 
+    # Start robot
+    question = '1'
+# --------------------------------------------------------
     
     # Get load cell offset
     # force_offset = robot.load_cell_zero()

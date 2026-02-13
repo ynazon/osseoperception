@@ -9,12 +9,13 @@ import time
 import busio
 import adafruit_ads1x15.ads1015 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
+import random
 
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
 	# Constants
 	max_control_effort = 1000 #2000 1000
 	scaling_factor = -1.0 #-0.5
-	kp = 120.0 # 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
+	kp = 110.0 # 120# 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
 	ki = 0.0 # 100
 	kd = 1.2 # 1.0 or 10.0 works
 	ped_gain = 0.0 # past error derivative gain term
@@ -91,6 +92,43 @@ def make_trajectory(sampling_freq,trajectory_type):
 		
 		# Add zero hold at the beginning of the trajectory
 		trajectory = np.concatenate((zero_addendum,sine_trajectory))
+
+	elif trajectory_type == 'block_burst_traj':
+		# This is a trajectory for each run
+		start_value = 0.0
+		end_value = 0.0
+		run_time = 10 # in mins
+		run_time = run_time * 60 # in seconds
+		rest_interval = 5.0 # in seconds
+		force_levels = [5,10,15,20] # in Newtons
+		ramp_size = 1/2 # as a fraction of application interval
+		number_of_sections = 5 # a section is comprised of x blocks and 1 rest interval
+		number_of_blocks_per_section = len(force_levels)
+		number_of_applications_per_block = 4
+
+		block_duration = (run_time - rest_interval*number_of_sections)/(number_of_blocks_per_section*number_of_sections)
+		application_interval = block_duration/(3*number_of_applications_per_block) # t0 in seconds
+		trajectory = []
+		
+		# # Add zero hold at the beginning of the trajectory
+		# zero_addendum_time = 3.0 # time in seconds
+		# zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
+		# trajectory = np.concatenate((trajectory,zero_addendum))
+
+		for _ in range(number_of_sections):
+			rest_period = np.linspace(0.0,0.0,num = math.floor(sampling_freq*rest_interval))
+			random.shuffle(force_levels) # Randomize force level
+			trajectory = np.concatenate((trajectory,rest_period))
+			for force in force_levels:
+				zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*application_interval))
+				ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval*ramp_size))
+				hold = np.linspace(force,force,num = math.floor(sampling_freq*application_interval))
+				ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*application_interval*ramp_size))
+				trajectory_cycle = np.concatenate((zero_hold,ramp_up,hold,ramp_down))
+				block = []
+				for _ in range(number_of_applications_per_block):
+					block = np.concatenate((block,trajectory_cycle))
+				trajectory = np.concatenate((trajectory,block))
 
 	elif trajectory_type == 'traj':
 		start_value = 0.0
@@ -221,7 +259,7 @@ def make_trajectory(sampling_freq,trajectory_type):
 
 	elif trajectory_type == 'step':
 		# Define step parameters
-		desired_step = 20.0 # in Nm
+		desired_step = 10.0 # in Nm
 		time_length_of_step = 5.0 # in seconds
 		x = np.linspace(desired_step,desired_step,num = math.floor(sampling_freq*time_length_of_step))
 		on_hold_traj = x
