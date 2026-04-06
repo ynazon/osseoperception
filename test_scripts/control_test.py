@@ -8,7 +8,8 @@ import robot_fxns as robot
 import time
 # import RPi.GPIO as gpio
 import busio
-import adafruit_ads1x15.ads1015 as ADS
+# import adafruit_ads1x15.ads1015 as ADS
+import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 import gpiozero
 from rtplot import client
@@ -80,7 +81,8 @@ output_pin.on()
 scl_pin = 3
 sda_pin = 2
 i2c = busio.I2C(scl_pin, sda_pin)
-ads = ADS.ADS1015(i2c)
+# ads = ADS.ADS1015(i2c)
+ads = ADS.ADS1115(i2c)
 ads.gain = 2/3 # Set adc max value to 6.144 V
 chan = AnalogIn(ads, ADS.P0) # Create single-ended input on channel 0
 
@@ -96,17 +98,17 @@ signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_
 # Initialize Data Saving Variables
 testing_flag = False
 test_time = 5.0 # In seconds
-name = 'traj_test_t3' # 'sine_freq_1hz_amp_15nm_t1'
-date = '2_13_26'
+name = 'new_wiring_test_t8' # 'sine_freq_1hz_amp_15nm_t1'
+date = '4_6_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/2_13_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/4_6_26/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
 sampling_freq = 250.0 # In Hz
 loop_dt = 1.0/sampling_freq
-desired_force = 20.0 #in Newtons
+desired_force = 5.0 #in Newtons
 iterations = 0
 
 desired_force_vector = []
@@ -179,6 +181,7 @@ try:
     
     # Get load cell offset
     # force_offset = robot.load_cell_zero()
+    # volt_offset = robot.load_cell_zero()
     force_offset = 0.0
     
     # Initialize loop time
@@ -199,8 +202,14 @@ try:
                 # current_force = 0.161*math.exp(1.506*voltage) - 0.161
                 # filtered_force = 0.161*math.exp(1.506*filtered_voltage) - 0.161
 
-                current_force = (148.26*voltage - 391.9) - force_offset 
-                filtered_force = (148.26*filtered_voltage - 391.9) - force_offset
+                # current_force = (148.26*voltage - 391.9) - force_offset 
+                # filtered_force = (148.26*filtered_voltage - 391.9) - force_offset
+                
+                current_force = (146.532248766305*voltage - 391.181161611298) - force_offset 
+                filtered_force = (146.532248766305*filtered_voltage - 391.181161611298) - force_offset
+
+                # current_force = (148.26*(voltage-volt_offset) - 391.9) 
+                # filtered_force = (148.26*(filtered_voltage-volt_offset) - 391.9) 
 
                 # get a control effort based on force error    
                 [control_effort, previous_error, kp, ki, kd, kp_term, ki_term , kd_term,
@@ -209,6 +218,7 @@ try:
                 
                 # send control effort as a pwm signal
                 valve_pwm.value = control_effort + 0.5  #May have to scale/normalize btwn 0 & 1
+                # valve_pwm.value = 0.5
 
                 # increase loop counter
                 iterations = iterations + 1
@@ -250,8 +260,14 @@ try:
                 # current_force = 0.161*math.exp(1.506*voltage) - 0.161
                 # filtered_force = 0.161*math.exp(1.506*filtered_voltage) - 0.161
 
-                current_force = (148.26*voltage - 391.9) - force_offset 
-                filtered_force = (148.26*filtered_voltage - 391.9) - force_offset
+                current_force = (146.532248766305*voltage - 391.181161611298) - force_offset 
+                filtered_force = (146.532248766305*filtered_voltage - 391.181161611298) - force_offset
+
+                # current_force = (148.26*voltage - 391.9) - force_offset 
+                # filtered_force = (148.26*filtered_voltage - 391.9) - force_offset
+
+                # current_force = (148.26*(voltage-volt_offset) - 391.9) 
+                # filtered_force = (148.26*(filtered_voltage-volt_offset) - 391.9) 
 
                 # get a control effort based on force error    
                 [control_effort, previous_error, kp, ki, kd, kp_term, ki_term , kd_term,

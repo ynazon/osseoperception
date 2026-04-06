@@ -12,11 +12,11 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import random
 
 def PID_control(desired_force,current_force,previous_error,error_over_time,error_derivative,estimation_pts,dt):
-	# Constants
+	# Constants kp-110, ki-0, kd-1.2
 	max_control_effort = 1000 #2000 1000
 	scaling_factor = -1.0 #-0.5
-	kp = 110.0 # 120# 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
-	ki = 0.0 # 100
+	kp = 65.0 # 120# 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
+	ki = 0.0 # 180
 	kd = 1.2 # 1.0 or 10.0 works
 	ped_gain = 0.0 # past error derivative gain term
 	ced_gain = 1.0 # current error derivative gain term
@@ -98,27 +98,38 @@ def make_trajectory(sampling_freq,trajectory_type):
 		start_value = 0.0
 		end_value = 0.0
 		run_time = 10 # in mins
-		run_time = run_time * 60 # in seconds
+		# run_time = run_time * 60 # in seconds
 		rest_interval = 5.0 # in seconds
-		force_levels = [5,10,15,20] # in Newtons
-		ramp_size = 1/2 # as a fraction of application interval
-		number_of_sections = 5 # a section is comprised of x blocks and 1 rest interval
-		number_of_blocks_per_section = len(force_levels)
+		force_levels = [0,5,10,15,20] # in Newtons
+		ramp_size = 3/4 # as a fraction of application interval
+		number_of_sections = 1 # a section is comprised of x blocks and 1 rest interval
 		number_of_applications_per_block = 4
 
-		block_duration = (run_time - rest_interval*number_of_sections)/(number_of_blocks_per_section*number_of_sections)
-		application_interval = block_duration/(3*number_of_applications_per_block) # t0 in seconds
+		# --------------------------------------------------------------------
+		# # Calculate block duration and application interval
+		# number_of_blocks_per_section = len(force_levels)
+		# block_duration = (run_time - rest_interval*number_of_sections)/(number_of_blocks_per_section*number_of_sections)
+		# application_interval = block_duration/(3*number_of_applications_per_block) # t0 in seconds
+		# --------------------------------------------------------------------
+
+		# --------------------------------------------------------------------
+		# Pre set application interval
+		application_interval = 1.0 # in sec
+		# --------------------------------------------------------------------
+		
+		latin_square = []
 		trajectory = []
 		
-		# # Add zero hold at the beginning of the trajectory
-		# zero_addendum_time = 3.0 # time in seconds
-		# zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
-		# trajectory = np.concatenate((trajectory,zero_addendum))
+		# Add ramp to zero hold at the beginning of the trajectory
+		zero_addendum_time = 3.0 # time in seconds
+		zero_addendum = np.linspace(-15.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
+		trajectory = np.concatenate((trajectory,zero_addendum))
 
-		for _ in range(number_of_sections):
-			rest_period = np.linspace(0.0,0.0,num = math.floor(sampling_freq*rest_interval))
-			random.shuffle(force_levels) # Randomize force level
-			trajectory = np.concatenate((trajectory,rest_period))
+		for idx in range(number_of_sections):
+			# rest_period = np.linspace(0.0,0.0,num = math.floor(sampling_freq*rest_interval))
+			# random.shuffle(force_levels) # Randomize force level
+			# trajectory = np.concatenate((trajectory,rest_period))
+			latin_square_row = []
 			for force in force_levels:
 				zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*application_interval))
 				ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval*ramp_size))
@@ -128,7 +139,17 @@ def make_trajectory(sampling_freq,trajectory_type):
 				block = []
 				for _ in range(number_of_applications_per_block):
 					block = np.concatenate((block,trajectory_cycle))
-				trajectory = np.concatenate((trajectory,block))
+				# trajectory = np.concatenate((trajectory,block))
+				latin_square1row = np.concatenate((latin_square_row,block))
+			latin_square.append(latin_square_row)
+			pop_value = force_levels.pop(0)
+			force_levels.append(pop_value)
+
+		random_array = np.arange(0, number_of_sections)
+		random.shuffle(random_array)
+
+		for idx in random_array:
+			trajectory = np.concatenate((trajectory,latin_square[idx]))
 
 	elif trajectory_type == 'traj':
 		start_value = 0.0
@@ -289,7 +310,7 @@ def load_cell_zero():
 	ads.gain = 2/3 # Set adc max value to 6.144 V
 	chan = AnalogIn(ads, ADS.P0) # Create single-ended input on channel 0
 
-	read_time = 1 # in seconds
+	read_time = 1.0 # in seconds
 	load_cell_voltage = []
 	t_init = time.time()
 
@@ -299,6 +320,7 @@ def load_cell_zero():
 	avg_voltage = sum(load_cell_voltage)/len(load_cell_voltage)
 	force_offset = 148.26*avg_voltage - 391.9
 	return force_offset
+	# return avg_voltage
 		
 
 # def robot_cleanup(pwm_pin,pwm_freq):
