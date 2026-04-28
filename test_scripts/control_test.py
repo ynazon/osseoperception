@@ -98,10 +98,10 @@ signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_
 # Initialize Data Saving Variables
 testing_flag = False
 test_time = 5.0 # In seconds
-name = 'new_wiring_test_t8' # 'sine_freq_1hz_amp_15nm_t1'
-date = '4_6_26'
+name = 'op_test_t0' # 'sine_freq_1hz_amp_15nm_t1'
+date = '4_21_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/4_6_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/4_21_26/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 

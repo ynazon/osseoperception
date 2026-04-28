@@ -140,7 +140,7 @@ def make_trajectory(sampling_freq,trajectory_type):
 				for _ in range(number_of_applications_per_block):
 					block = np.concatenate((block,trajectory_cycle))
 				# trajectory = np.concatenate((trajectory,block))
-				latin_square1row = np.concatenate((latin_square_row,block))
+				latin_square_row = np.concatenate((latin_square_row,block))
 			latin_square.append(latin_square_row)
 			pop_value = force_levels.pop(0)
 			force_levels.append(pop_value)
