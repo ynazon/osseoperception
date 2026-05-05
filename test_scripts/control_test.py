@@ -98,15 +98,15 @@ signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_
 # Initialize Data Saving Variables
 testing_flag = False
 test_time = 5.0 # In seconds
-name = 'op_test_t0' # 'sine_freq_1hz_amp_15nm_t1'
-date = '4_21_26'
+name = 'new_lat_sq_t6' # 'sine_freq_1hz_amp_15nm_t1'
+date = '4_30_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/4_21_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/4_30_26/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
-sampling_freq = 250.0 # In Hz
+sampling_freq = 100.0 # In Hz
 loop_dt = 1.0/sampling_freq
 desired_force = 5.0 #in Newtons
 iterations = 0
@@ -128,8 +128,12 @@ error_sum = 0.0
 error_derivative = 0.0
 
 # Create Control Trajectory
-traj_type = 'block_burst_traj' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step' # 'block_burst_traj'
-traj = robot.make_trajectory(sampling_freq,traj_type)
+# traj_type = 'latin_square_traj' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step' # 'block_burst_traj' # 'latin_square_traj'
+# traj = robot.make_trajectory(sampling_freq,traj_type)
+
+traj_type = 'ls1'
+traj = robot.make_ls(sampling_freq,traj_type)
+print('Run Time: ' + str((len(traj)*loop_dt) + 1.0) + ' sec')
 
 # Create lowpass filter
 fc = 20.0
@@ -157,17 +161,17 @@ try:
     # question = '1'
 
 # --------------- Keyboard Input Start ----------------
-    # print("Waiting to start. Press 'S' to start.")
-    # while received_data != 'KEY_S':
-    #     events = inputs.get_key()
-    #     for event in events:
-    #         if event.ev_type == 'Key':
-    #             if event.state == 1:  # Key pressed
-    #                 received_data = event.code
-    #                 print(f'Key {event.code} pressed')
-    #                 question = '1'
-    #         else:
-    #             print("Waiting to start. Press 'S' to start.")
+    print("Waiting to start. Press 'S' to start.")
+    while received_data != 'KEY_S':
+        events = inputs.get_key()
+        for event in events:
+            if event.ev_type == 'Key':
+                if event.state == 1:  # Key pressed
+                    received_data = event.code
+                    print(f'Key {event.code} pressed')
+                    question = '1'
+            else:
+                print("Waiting to start. Press 'S' to start.")
 
 # --------------- User Input Start ----------------
 
@@ -175,8 +179,8 @@ try:
     # question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
 
 # ----------------- Automatic Start ------------------------- 
-    # Start robot
-    question = '1'
+    # # Start robot
+    # question = '1'
 # --------------------------------------------------------
     
     # Get load cell offset
@@ -308,6 +312,17 @@ try:
     # data_to_send = 'w'
     # ser.write(data_to_send.encode('utf-8'))
     
+    # Shut Down Robot
+    print('\nStopping PWM\n')
+    valve_pwm.value = 0.5
+    valve_pwm.close()
+
+    signal_pwm.value = 0.0
+    signal_pwm.close()
+
+    output_pin.close()
+    input_pin.close()
+
     # Save data as excel sheet
     book = xlsxwriter.Workbook(file_save_path)
     sheet1 = book.add_worksheet('Sheet 1')
@@ -320,7 +335,7 @@ try:
     sheet1.write(0,5,'Iterations')
     sheet1.write(1,5,iterations)
 
-    sheet1.write(0,6,'Trajectory')
+    # sheet1.write(0,6,'Trajectory')
     sheet1.write(0,7,'Filtered Voltage')
     sheet1.write(0,8,'Filtered Force')
 
@@ -346,7 +361,7 @@ try:
             sheet1.write(i,2,current_force_vector[index])
             sheet1.write(i,3,voltage_vector[index])
             sheet1.write(i,4,control_effort_vector[index])
-            sheet1.write(i,6,traj[index])
+            # sheet1.write(i,6,traj[index])
             sheet1.write(i,7,filtered_voltage_vector[index])
             sheet1.write(i,8,filtered_force_vector[index])
             # sheet1.write(i,13,desired_trajectory_vector[index])
@@ -359,23 +374,13 @@ try:
             sheet1.write(i,2,current_force_vector[index])
             sheet1.write(i,3,voltage_vector[index])
             sheet1.write(i,4,control_effort_vector[index])
-            sheet1.write(i,6,final_traj[index])
+            # sheet1.write(i,6,final_traj[index])
             sheet1.write(i,7,filtered_voltage_vector[index])
             sheet1.write(i,8,filtered_force_vector[index])
             # sheet1.write(i,13,desired_trajectory_vector[index])
             i = i+1
 
     book.close()
-
-    print('\nStopping PWM\n')
-    valve_pwm.value = 0.5
-    valve_pwm.close()
-
-    signal_pwm.value = 0.0
-    signal_pwm.close()
-
-    output_pin.close()
-    input_pin.close()
 
 except KeyboardInterrupt:
     print('\nStopping PWM\n')
@@ -403,7 +408,7 @@ except KeyboardInterrupt:
         sheet1.write(0,5,'Iterations')
         sheet1.write(1,5,iterations)
 
-        sheet1.write(0,6,'Trajectory')
+        # sheet1.write(0,6,'Trajectory')
         sheet1.write(0,7,'Filtered Voltage')
         sheet1.write(0,8,'Filtered Force')
 
@@ -429,7 +434,7 @@ except KeyboardInterrupt:
                 sheet1.write(i,2,current_force_vector[index])
                 sheet1.write(i,3,voltage_vector[index])
                 sheet1.write(i,4,control_effort_vector[index])
-                sheet1.write(i,6,'N/A')
+                # sheet1.write(i,6,'N/A')
                 sheet1.write(i,7,filtered_voltage_vector[index])
                 sheet1.write(i,8,filtered_force_vector[index])
                 # sheet1.write(i,13,desired_trajectory_vector[index])
@@ -442,7 +447,7 @@ except KeyboardInterrupt:
                 sheet1.write(i,2,current_force_vector[index])
                 sheet1.write(i,3,voltage_vector[index])
                 sheet1.write(i,4,control_effort_vector[index])
-                sheet1.write(i,6,final_traj[index])
+                # sheet1.write(i,6,final_traj[index])
                 sheet1.write(i,7,filtered_voltage_vector[index])
                 sheet1.write(i,8,filtered_force_vector[index])
                 # sheet1.write(i,13,desired_trajectory_vector[index])
