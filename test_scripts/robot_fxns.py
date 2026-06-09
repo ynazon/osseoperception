@@ -118,89 +118,110 @@ def balanced_latin_square(n):
         return square
 
 
-def make_ls(sampling_freq,ls_type):
-    
-    if (ls_type != 'ls1') and (ls_type !='ls2') and (ls_type !='ls3') and (ls_type !='ls4'):
-        print("ls_type is not 'ls1' or 'ls2' or 'ls3' or 'ls4'. Please reinput ls_type value")
-        return
-    else:
-        start_value = 0.0
-        end_value = 0.0
-        force_levels = [0,7,14,21] # in Newtons
-        ramp_size = 3/4 # as a fraction of application interval
-        number_of_applications_per_block = 4    
-        application_interval = 1.0 # Pre set application interval in sec 
-        trajectory = []
+def make_ls(sampling_freq,ls_type,operating_condition):
 
-        # Define Latin Squares
-        ls = {
-            'ls1': 
-            [[0, 1, 3, 2],
-            [1, 2, 0, 3],
-            [2, 3, 1, 0],
-            [3, 0, 2, 1]],
+	if (ls_type != 'ls1') and (ls_type !='ls2') and (ls_type !='ls3') and (ls_type !='ls4'):
+		print("ls_type is not 'ls1' or 'ls2' or 'ls3' or 'ls4'. Please reinput ls_type value")
+		return
+	else:
+		if (operating_condition != 'ramp_const') and (operating_condition != 'hold_const'):
+			print("operating_condition is not 'ramp_const' or 'hold_const'. Please reinput operating_condition value")
+			return
+		else:
+			# Initialize values
+			start_value = 0.0
+			end_value = 0.0
+			force_levels = [0,7,14,21] # in Newtons
+			number_of_applications_per_block = 4
+			trajectory = []
 
-            'ls2':
-            [[3, 0, 2, 1],
-             [2, 3, 1, 0],
-             [1, 2, 0, 3],
-             [0, 1, 3, 2]],
+			if operating_condition == 'ramp_const':
+				force_rate = 1/15
+				block_duration = 14 # in sec
+				application_interval = np.zeros(len(force_levels))
+				ramp_time_scalar = np.zeros(len(force_levels))
+				for i in range(0,len(force_levels)):
+					application_interval[i] = (1/2)*((block_duration/number_of_applications_per_block)-2*force_rate*force_levels[i])
+					ramp_time_scalar[i] = force_rate*force_levels[i]
+					# application_interval[i] =  block_duration/((number_of_applications_per_block)*(2)*(1+ramp_size[i]))  
 
-            'ls3':
-            [[2, 3, 1, 0],
-             [1, 2, 0, 3],
-             [0, 1, 3, 2],
-             [3, 0, 2, 1]],
+			else:
+				ramp_size = (5/4)*np.zeros(len(force_levels)) # as a fraction of application interval 
+				application_interval = 1.0*np.zeros(len(force_levels)) # Pre set application interval in sec 
+				
+			# Define Latin Squares
+			ls = {
+				'ls1': 
+				[[0, 1, 3, 2],
+				[1, 2, 0, 3],
+				[2, 3, 1, 0],
+				[3, 0, 2, 1]],
 
-            'ls4':
-            [[3, 0, 2, 1],
-            [0, 1, 3, 2],
-            [1, 2, 0, 3],
-            [2, 3, 1, 0]],
+				'ls2':
+				[[3, 0, 2, 1],
+				[2, 3, 1, 0],
+				[1, 2, 0, 3],
+				[0, 1, 3, 2]],
 
-            'ls5':
-            [[1, 0, 3, 2],
-            [3, 1, 2, 0],
-            [0, 2, 1, 3],
-            [2, 3, 0, 1]],
+				'ls3':
+				[[2, 3, 1, 0],
+				[1, 2, 0, 3],
+				[0, 1, 3, 2],
+				[3, 0, 2, 1]],
 
-            'ls6':
-            [[3, 1, 2, 0],
-            [1, 0, 3, 2],
-            [2, 3, 0, 1],
-            [0, 2, 1, 3]]
-        }
+				'ls4':
+				[[3, 0, 2, 1],
+				[0, 1, 3, 2],
+				[1, 2, 0, 3],
+				[2, 3, 1, 0]],
 
-        # Add ramp to zero hold at the beginning of the trajectory
-        ramp_addendum_time = 3.0 # time in seconds
-        ramp_addendum = np.linspace(-15.0,0.0,num = math.floor(sampling_freq*ramp_addendum_time))
-        trajectory = np.concatenate((trajectory,ramp_addendum))
+				'ls5':
+				[[1, 0, 3, 2],
+				[3, 1, 2, 0],
+				[0, 2, 1, 3],
+				[2, 3, 0, 1]],
 
-        # Add ramp to zero hold at the beginning of the trajectory
-        zero_addendum_time = 30.0 # time in seconds
-        zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
-        trajectory = np.concatenate((trajectory,zero_addendum))
+				'ls6':
+				[[3, 1, 2, 0],
+				[1, 0, 3, 2],
+				[2, 3, 0, 1],
+				[0, 2, 1, 3]]
+			}
 
-        # Define current latin square for use
-        current_square = ls[ls_type]
-        for i in range(0,len(current_square)):
-            for j in range(0,len(current_square[i])):
-                force = force_levels[current_square[i][j]]
-                zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*application_interval))
-                ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval*ramp_size))
-                hold = np.linspace(force,force,num = math.floor(sampling_freq*application_interval))
-                ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*application_interval*ramp_size))
-                trajectory_cycle = np.concatenate((zero_hold,ramp_up,hold,ramp_down))
-                block = []
-                for _ in range(number_of_applications_per_block):
-                    block = np.concatenate((block,trajectory_cycle))
-                trajectory = np.concatenate((trajectory,block))
+			# Add ramp to zero hold at the beginning of the trajectory
+			ramp_addendum_time = 3.0 # time in seconds
+			ramp_addendum = np.linspace(-15.0,0.0,num = math.floor(sampling_freq*ramp_addendum_time))
+			trajectory = np.concatenate((trajectory,ramp_addendum))
 
-        # Add ramp to zero hold at the end of the trajectory
-        zero_addendum_time = 5.0 # time in seconds
-        zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
-        trajectory = np.concatenate((trajectory,zero_addendum))
-        return trajectory
+			# zero hold at the beginning of the trajectory
+			zero_addendum_time = 30.0 # time in seconds
+			zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*zero_addendum_time))
+			trajectory = np.concatenate((trajectory,zero_addendum))
+
+			# Define current latin square for use
+			current_square = ls[ls_type]
+			for i in range(0,len(current_square)):
+				for j in range(0,len(current_square[i])):
+					force = force_levels[current_square[i][j]]
+					zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*application_interval[current_square[i][j]]))
+					hold = np.linspace(force,force,num = math.floor(sampling_freq*application_interval[current_square[i][j]]))
+					if operating_condition == 'ramp_const':
+						ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval[current_square[i][j]]*ramp_size[current_square[i][j]]))
+						ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*application_interval[current_square[i][j]]*ramp_size[current_square[i][j]]))
+					else:
+						ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*ramp_time_scalar[current_square[i][j]]))
+						ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*ramp_time_scalar[current_square[i][j]]))
+					trajectory_cycle = np.concatenate((zero_hold,ramp_up,hold,ramp_down))
+					block = []
+					for _ in range(number_of_applications_per_block):
+						block = np.concatenate((block,trajectory_cycle))
+					trajectory = np.concatenate((trajectory,block))
+
+			# Add ramp to zero hold at the end of the trajectory
+			end_zero_addendum_time = 5.0 # time in seconds
+			end_zero_addendum = np.linspace(0.0,0.0,num = math.floor(sampling_freq*end_zero_addendum_time))
+			trajectory = np.concatenate((trajectory,end_zero_addendum))
+			return trajectory
 
 def make_trajectory(sampling_freq,trajectory_type):
 	if trajectory_type == 'sine':

@@ -98,10 +98,10 @@ signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_
 # Initialize Data Saving Variables
 testing_flag = False # Input: True or False
 test_time = 5.0 # In seconds
-name = 'steph_test_t4' # 'sine_freq_1hz_amp_15nm_t1' 'steph_test_t1'
-date = '5_27_26'
+name = 'new_ls_test_t3' # 'sine_freq_1hz_amp_15nm_t1' 'steph_test_t1'
+date = '6_9_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/5_27_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/' + date +'/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
@@ -132,11 +132,14 @@ error_derivative = 0.0
 # traj_type = 'sine' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step' # 'block_burst_traj' # 'latin_square_traj'
 # traj = robot.make_trajectory(sampling_freq,traj_type)
 
-traj_type = 'ls4'
-traj = robot.make_ls(sampling_freq,traj_type)
+# Create Control Trajectory
+traj_type = 'ls1'
+op_cond = 'ramp_const' # options: 'ramp_const' or 'hold_const'
+traj = robot.make_ls(sampling_freq,traj_type,op_cond)
 
 print('Testing Flag Active: ' + str(testing_flag))
 print('Latin Square ' + '| ' + traj_type + ' |' + ' being used' )
+print('Operating Condition: ' + op_cond)
 print('Run Time: ' + str((len(traj)*loop_dt) + 1.0) + ' sec')
 
 # Create lowpass filter
@@ -165,17 +168,17 @@ try:
     # question = '1'
 
 # --------------- Keyboard Input Start ----------------
-    print("Waiting to start. Press 'S' to start.")
-    while received_data != 'KEY_S':
-        events = inputs.get_key()
-        for event in events:
-            if event.ev_type == 'Key':
-                if event.state == 1:  # Key pressed
-                    received_data = event.code
-                    print(f'Key {event.code} pressed')
-                    question = '1'
-            else:
-                print("Waiting to start. Press 'S' to start.")
+    # print("Waiting to start. Press 'S' to start.")
+    # while received_data != 'KEY_S':
+    #     events = inputs.get_key()
+    #     for event in events:
+    #         if event.ev_type == 'Key':
+    #             if event.state == 1:  # Key pressed
+    #                 received_data = event.code
+    #                 print(f'Key {event.code} pressed')
+    #                 question = '1'
+    #         else:
+    #             print("Waiting to start. Press 'S' to start.")
 
 # --------------- User Input Start ----------------
 
@@ -183,8 +186,8 @@ try:
     # question = input('Set up for perturbation experiment. When you are ready to continue type " 1 " (the number one) without parentheses. ')
 
 # ----------------- Automatic Start ------------------------- 
-    # # Start robot
-    # question = '1'
+    # Start robot
+    question = '1'
 # --------------------------------------------------------
     
     # Get load cell offset
