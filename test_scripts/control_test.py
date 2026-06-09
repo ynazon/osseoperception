@@ -29,8 +29,8 @@ from scipy.signal import butter, lfilter, lfilter_zi
 # Step 2: Initialize the plots
 # Initialize one plot with 1 traces
 
-plot_config1 = {'names' : ['Actual Force','Desired Force'],
-                'colors' : ['r','b'],
+plot_config1 = {'names' : ['Desired Force','Actual Force'],
+                'colors' : ['b','r'],
                 'line_style': ['',''],
                 'title' : "Robot Force",
                 'ylabel': "Output Force (N)",
@@ -96,23 +96,24 @@ signal_pwm_pin = 13
 signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_value=0.0, frequency=signal_pwm_freq)
 
 # Initialize Data Saving Variables
-testing_flag = False
+testing_flag = False # Input: True or False
 test_time = 5.0 # In seconds
-name = 'new_lat_sq_t6' # 'sine_freq_1hz_amp_15nm_t1'
-date = '4_30_26'
+name = 'steph_test_t4' # 'sine_freq_1hz_amp_15nm_t1' 'steph_test_t1'
+date = '5_27_26'
 trial_name = name + '_' + date + '.xlsx'
-save_location = '/home/pi/osseoperception/test_scripts/test_data/4_30_26/'
+save_location = '/home/pi/osseoperception/test_scripts/test_data/5_27_26/'
 file_save_path = save_location + trial_name
 print('Trial name is: ',name)
 
 # Initialize Control Variables
 sampling_freq = 100.0 # In Hz
 loop_dt = 1.0/sampling_freq
-desired_force = 5.0 #in Newtons
+desired_force = 7.0 #in Newtons
 iterations = 0
 
 desired_force_vector = []
-current_force_vector = []
+raw_force_vector = []
+filtered_measured_force_vector = []
 voltage_vector = []
 control_effort_vector = []
 time_loop_start = []
@@ -121,18 +122,21 @@ time_loop_start = []
 differentiation_points = [0.0,0.0,0.0,0.0]
 filter_points = [0.0,0.0,0.0,0.0]
 filtered_voltage_vector = []
-filtered_force_vector = []
+offset_control_input_force_vector = []
 
 previous_error = 0.0
 error_sum = 0.0
 error_derivative = 0.0
 
 # Create Control Trajectory
-# traj_type = 'latin_square_traj' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step' # 'block_burst_traj' # 'latin_square_traj'
+# traj_type = 'sine' # options: 'vibe_n_hold' # 'on_off' # 'traj' # 'fgwn' # 'sine' # 'step' # 'block_burst_traj' # 'latin_square_traj'
 # traj = robot.make_trajectory(sampling_freq,traj_type)
 
-traj_type = 'ls1'
+traj_type = 'ls4'
 traj = robot.make_ls(sampling_freq,traj_type)
+
+print('Testing Flag Active: ' + str(testing_flag))
+print('Latin Square ' + '| ' + traj_type + ' |' + ' being used' )
 print('Run Time: ' + str((len(traj)*loop_dt) + 1.0) + ' sec')
 
 # Create lowpass filter
@@ -184,9 +188,8 @@ try:
 # --------------------------------------------------------
     
     # Get load cell offset
-    # force_offset = robot.load_cell_zero()
-    # volt_offset = robot.load_cell_zero()
-    force_offset = 0.0
+    force_offset = robot.load_cell_zero()
+    # force_offset = -0.675 # 0.0
     
     # Initialize loop time
     t_init = time.time()
@@ -202,22 +205,13 @@ try:
                 filtered_voltage, zi = robot.realtime_lowpass_filter(voltage, b, a, zi)
                 # [filtered_voltage,filter_points] = robot.ma_filter(voltage,filter_points)
                 
-                # # convert adc voltage to a force for an FSR
-                # current_force = 0.161*math.exp(1.506*voltage) - 0.161
-                # filtered_force = 0.161*math.exp(1.506*filtered_voltage) - 0.161
-
-                # current_force = (148.26*voltage - 391.9) - force_offset 
-                # filtered_force = (148.26*filtered_voltage - 391.9) - force_offset
-                
-                current_force = (146.532248766305*voltage - 391.181161611298) - force_offset 
-                filtered_force = (146.532248766305*filtered_voltage - 391.181161611298) - force_offset
-
-                # current_force = (148.26*(voltage-volt_offset) - 391.9) 
-                # filtered_force = (148.26*(filtered_voltage-volt_offset) - 391.9) 
+                raw_force = (146.532248766305*(voltage) - 391.181161611298) 
+                filtered_measured_force = (146.532248766305*(filtered_voltage) - 391.181161611298)
+                # offset_control_input_force = (146.532248766305*(filtered_voltage - 2.674) - 391.181161611298) - force_offset
 
                 # get a control effort based on force error    
                 [control_effort, previous_error, kp, ki, kd, kp_term, ki_term , kd_term,
-                error_sum, error_derivative, differentiation_points] = robot.PID_control(desired_force,filtered_force,previous_error,
+                error_sum, error_derivative, differentiation_points] = robot.PID_control(desired_force,filtered_measured_force,previous_error,
                                                                                         error_sum,error_derivative,differentiation_points,loop_dt)
                 
                 # send control effort as a pwm signal
@@ -230,17 +224,19 @@ try:
                 # Append data for saving
                 time_loop_start.append(t1-t_init)
                 desired_force_vector.append(desired_force)
-                current_force_vector.append(current_force)
+                raw_force_vector.append(raw_force)
                 voltage_vector.append(voltage)
                 control_effort_vector.append(control_effort)
                 filtered_voltage_vector.append(filtered_voltage)
-                filtered_force_vector.append(filtered_force)
+                # offset_control_input_force_vector.append(offset_control_input_force)
                 traj.append(desired_force)
+                filtered_measured_force_vector.append(filtered_measured_force)
                 # desired_trajectory_vector.append(signal_pwm.value) # normalized_traj_value
 
                 # Send data to plot
-                client.send_array([filtered_force,desired_force])
-                # client.send_array([filtered_force])
+                client.send_array([filtered_measured_force,desired_force])
+                # client.send_array([offset_control_input_force,desired_force])
+                # client.send_array([offset_control_input_force])
 
                 # Send data to robot via serial
                 # data_to_send = str(desired_force) + '\n'
@@ -261,25 +257,22 @@ try:
                 # [filtered_voltage,filter_points] = robot.ma_filter(voltage,filter_points)
                 
                 # # convert adc voltage to a force for an FSR
-                # current_force = 0.161*math.exp(1.506*voltage) - 0.161
+                # raw_force = 0.161*math.exp(1.506*voltage) - 0.161
                 # filtered_force = 0.161*math.exp(1.506*filtered_voltage) - 0.161
 
-                current_force = (146.532248766305*voltage - 391.181161611298) - force_offset 
-                filtered_force = (146.532248766305*filtered_voltage - 391.181161611298) - force_offset
-
-                # current_force = (148.26*voltage - 391.9) - force_offset 
-                # filtered_force = (148.26*filtered_voltage - 391.9) - force_offset
-
-                # current_force = (148.26*(voltage-volt_offset) - 391.9) 
-                # filtered_force = (148.26*(filtered_voltage-volt_offset) - 391.9) 
+                raw_force = (146.532248766305*(voltage) - 391.181161611298) 
+                filtered_measured_force = (146.532248766305*(filtered_voltage) - 391.181161611298)
+                # offset_control_input_force = (146.532248766305*(filtered_voltage) - 391.181161611298) - force_offset
+ 
 
                 # get a control effort based on force error    
                 [control_effort, previous_error, kp, ki, kd, kp_term, ki_term , kd_term,
-                error_sum, error_derivative, differentiation_points] = robot.PID_control(desired_force,current_force,previous_error,
+                error_sum, error_derivative, differentiation_points] = robot.PID_control(desired_force,filtered_measured_force,previous_error,
                                                                                         error_sum,error_derivative,differentiation_points,loop_dt)
                 
                 # send control effort as a pwm signal
                 valve_pwm.value = control_effort + 0.5  #May have to scale/normalize btwn 0 & 1
+                # valve_pwm.value = 0.5
 
                 # increase loop counter
                 iterations = iterations + 1
@@ -287,15 +280,17 @@ try:
                 # Append data for saving
                 time_loop_start.append(t1-t_init)
                 desired_force_vector.append(desired_force)
-                current_force_vector.append(current_force)
+                raw_force_vector.append(raw_force)
+                filtered_measured_force_vector.append(filtered_measured_force)
                 voltage_vector.append(voltage)
                 control_effort_vector.append(control_effort)
                 filtered_voltage_vector.append(filtered_voltage)
-                filtered_force_vector.append(filtered_force)
+                # offset_control_input_force_vector.append(offset_control_input_force)
                 # desired_trajectory_vector.append(signal_pwm.value) # normalized_traj_value
                 
                 # Send data to plot
-                client.send_array([filtered_force,desired_force])
+                client.send_array([desired_force,filtered_measured_force])
+                # client.send_array([offset_control_input_force,desired_force,filtered_measured_force])
 
                 # # Send data to robot via serial
                 # data_to_send = str(desired_force) + '\n'
@@ -328,14 +323,16 @@ try:
     sheet1 = book.add_worksheet('Sheet 1')
     sheet1.write(0,0,'Time Loop Start')
     sheet1.write(0,1,'Desired Force')
-    sheet1.write(0,2,'Actual Force')
+    sheet1.write(0,2,'Raw Force')
     sheet1.write(0,3,'ADC Voltage')
     sheet1.write(0,4,'Control Effort')
 
     sheet1.write(0,5,'Iterations')
     sheet1.write(1,5,iterations)
+    sheet1.write(0,6,'Trajectory Type')
+    sheet1.write(1,6,traj_type)
 
-    # sheet1.write(0,6,'Trajectory')
+
     sheet1.write(0,7,'Filtered Voltage')
     sheet1.write(0,8,'Filtered Force')
 
@@ -355,28 +352,28 @@ try:
 
     i = 1
     if testing_flag == True:
-        for index in range(len(current_force_vector)):
+        for index in range(len(raw_force_vector)):
             sheet1.write(i,0,time_loop_start[index])
             sheet1.write(i,1,desired_force_vector[index])
-            sheet1.write(i,2,current_force_vector[index])
+            sheet1.write(i,2,raw_force_vector[index])
             sheet1.write(i,3,voltage_vector[index])
             sheet1.write(i,4,control_effort_vector[index])
             # sheet1.write(i,6,traj[index])
             sheet1.write(i,7,filtered_voltage_vector[index])
-            sheet1.write(i,8,filtered_force_vector[index])
+            sheet1.write(i,8,filtered_measured_force_vector[index])
             # sheet1.write(i,13,desired_trajectory_vector[index])
             i = i+1
     else:
         final_traj = traj.tolist()
-        for index in range(len(current_force_vector)):
+        for index in range(len(filtered_measured_force_vector)):
             sheet1.write(i,0,time_loop_start[index])
             sheet1.write(i,1,desired_force_vector[index])
-            sheet1.write(i,2,current_force_vector[index])
+            sheet1.write(i,2,raw_force_vector[index])
             sheet1.write(i,3,voltage_vector[index])
             sheet1.write(i,4,control_effort_vector[index])
             # sheet1.write(i,6,final_traj[index])
             sheet1.write(i,7,filtered_voltage_vector[index])
-            sheet1.write(i,8,filtered_force_vector[index])
+            sheet1.write(i,8,filtered_measured_force_vector[index])
             # sheet1.write(i,13,desired_trajectory_vector[index])
             i = i+1
 
@@ -401,12 +398,14 @@ except KeyboardInterrupt:
         sheet1 = book.add_worksheet('Sheet 1')
         sheet1.write(0,0,'Time Loop Start')
         sheet1.write(0,1,'Desired Force')
-        sheet1.write(0,2,'Actual Force')
+        sheet1.write(0,2,'Raw Force')
         sheet1.write(0,3,'ADC Voltage')
         sheet1.write(0,4,'Control Effort')
 
         sheet1.write(0,5,'Iterations')
         sheet1.write(1,5,iterations)
+        sheet1.write(0,6,'Trajectory Type')
+        sheet1.write(1,6,traj_type)
 
         # sheet1.write(0,6,'Trajectory')
         sheet1.write(0,7,'Filtered Voltage')
@@ -428,28 +427,28 @@ except KeyboardInterrupt:
 
         i = 1
         if testing_flag == True:
-            for index in range(len(current_force_vector)):
+            for index in range(len(raw_force_vector)):
                 sheet1.write(i,0,time_loop_start[index])
                 sheet1.write(i,1,desired_force_vector[index])
-                sheet1.write(i,2,current_force_vector[index])
+                sheet1.write(i,2,raw_force_vector[index])
                 sheet1.write(i,3,voltage_vector[index])
                 sheet1.write(i,4,control_effort_vector[index])
                 # sheet1.write(i,6,'N/A')
                 sheet1.write(i,7,filtered_voltage_vector[index])
-                sheet1.write(i,8,filtered_force_vector[index])
+                sheet1.write(i,8,filtered_measured_force_vector[index])
                 # sheet1.write(i,13,desired_trajectory_vector[index])
                 i = i+1
         else:
             final_traj = traj.tolist()
-            for index in range(len(current_force_vector)):
+            for index in range(len(raw_force_vector)):
                 sheet1.write(i,0,time_loop_start[index])
                 sheet1.write(i,1,desired_force_vector[index])
-                sheet1.write(i,2,current_force_vector[index])
+                sheet1.write(i,2,raw_force_vector[index])
                 sheet1.write(i,3,voltage_vector[index])
                 sheet1.write(i,4,control_effort_vector[index])
                 # sheet1.write(i,6,final_traj[index])
                 sheet1.write(i,7,filtered_voltage_vector[index])
-                sheet1.write(i,8,filtered_force_vector[index])
+                sheet1.write(i,8,filtered_measured_force_vector[index])
                 # sheet1.write(i,13,desired_trajectory_vector[index])
                 i = i+1
 

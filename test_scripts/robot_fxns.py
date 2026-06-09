@@ -7,7 +7,8 @@ from scipy.signal import butter, lfilter, filtfilt
 import math
 import time
 import busio
-import adafruit_ads1x15.ads1015 as ADS
+# import adafruit_ads1x15.ads1015 as ADS
+import adafruit_ads1x15.ads1115 as ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 import random
 
@@ -15,9 +16,9 @@ def PID_control(desired_force,current_force,previous_error,error_over_time,error
 	# Constants kp-110, ki-0, kd-1.2
 	max_control_effort = 1000 #2000 1000
 	scaling_factor = -1.0 #-0.5
-	kp = 65.0 # 120# 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
-	ki = 0.0 # 180
-	kd = 1.2 # 1.0 or 10.0 works
+	kp = 80.0 # 120# 150 #110 is best for SF=-1.0, MCE=1000 & MA filter # 2000 is best for SF=-0.25, MCE=4000 & MA filter
+	ki = 95.0 # 180
+	kd = 0.35 # 1.0 or 10.0 works 1.2
 	ped_gain = 0.0 # past error derivative gain term
 	ced_gain = 1.0 # current error derivative gain term
 	# Note: ced_gain + ped_gain = 1.0
@@ -125,7 +126,7 @@ def make_ls(sampling_freq,ls_type):
     else:
         start_value = 0.0
         end_value = 0.0
-        force_levels = [1,8,15,22] # in Newtons
+        force_levels = [0,7,14,21] # in Newtons
         ramp_size = 3/4 # as a fraction of application interval
         number_of_applications_per_block = 4    
         application_interval = 1.0 # Pre set application interval in sec 
@@ -206,20 +207,23 @@ def make_trajectory(sampling_freq,trajectory_type):
 		start_value = 0.0
 		end_value = 2*math.pi
 	
-		scaling_term = 1 # in Nm
-		sine_wave_frequency = 1 # in Hz
+		scaling_term = 5.0 # in Nm
+		sine_wave_frequency = 0.75 # in Hz
 		time_length_of_trajectory = 1.0/sine_wave_frequency
 		offset = 10.0 # in Nm
+		amt_of_reps = 10
 		
 		x = np.linspace(start_value,end_value,num = math.floor(sampling_freq*time_length_of_trajectory))
 		sine_trajectory = scaling_term * np.sin(x) + offset
 
-		zero_addendum_time = 2.0 # time in seconds
+		zero_addendum_time = 5.0 # time in seconds
 		zero_addendum = np.linspace(offset,offset,num = math.floor(sampling_freq*zero_addendum_time))
 		trajectory = []
 		
 		# Add zero hold at the beginning of the trajectory
-		trajectory = np.concatenate((zero_addendum,sine_trajectory))
+		trajectory = np.concatenate((trajectory,zero_addendum))
+		for _ in range(amt_of_reps):
+			trajectory = np.concatenate((trajectory,sine_trajectory))
 
 	elif trajectory_type == 'block_burst_traj':
 		# This is a trajectory for each run
@@ -322,7 +326,7 @@ def make_trajectory(sampling_freq,trajectory_type):
 		start_value = 0.0
 		end_value = 0.0
 
-		application_interval = 5.0 # t0 in seconds, 10 sec
+		application_interval = 1.0 # t0 in seconds, 10 sec
 		rest_interval = 1.5*application_interval # in seconds
 		force_levels = [5,10,15,20] # in Newtons
 		ramp_sizes = [1/4,1/2,3/4,1] # as a fraction of application interval
@@ -359,7 +363,7 @@ def make_trajectory(sampling_freq,trajectory_type):
 		gaussian_noise = np.concatenate((zero_addendum,gaussian_noise))
 				
 		# Filter Signal
-		cutoff_freq = 10.0 # Cutoff frequency (Hz)
+		cutoff_freq = 5.0 # Cutoff frequency (Hz)
 		nyquist_freq = 0.5*sampling_freq # Nyquist Frequency
 		normalized_cutoff = cutoff_freq/nyquist_freq
 		order = 4
@@ -422,7 +426,7 @@ def make_trajectory(sampling_freq,trajectory_type):
 		# time_length_of_trajectory = 1.0 # in seconds
 
 		# Define "on" parameters
-		torque_hold = 15.0 # in Nm
+		torque_hold = 7.0 # in Nm
 		time_length_of_hold = 2.0 # in seconds
 		x = np.linspace(torque_hold,torque_hold,num = math.floor(sampling_freq*time_length_of_hold))
 		on_hold_traj = x
@@ -447,13 +451,13 @@ def make_trajectory(sampling_freq,trajectory_type):
 
 	elif trajectory_type == 'step':
 		# Define step parameters
-		desired_step = 10.0 # in Nm
-		time_length_of_step = 5.0 # in seconds
+		desired_step = 0.0 # in Nm
+		time_length_of_step = 2.0 # in seconds
 		x = np.linspace(desired_step,desired_step,num = math.floor(sampling_freq*time_length_of_step))
 		on_hold_traj = x
 		
 		# Define "zero hold" parameters
-		off_time_length_of_hold = 3.0 # time of 0N hold before step in seconds
+		off_time_length_of_hold = 2.0 # time of 0N hold before step in seconds
 		x = np.linspace(0.0,0.0,num = math.floor(sampling_freq*off_time_length_of_hold))
 		off_hold_traj = x
 
@@ -473,7 +477,7 @@ def load_cell_zero():
 	scl_pin = 3
 	sda_pin = 2
 	i2c = busio.I2C(scl_pin, sda_pin)
-	ads = ADS.ADS1015(i2c)
+	ads = ADS.ADS1115(i2c)
 	ads.gain = 2/3 # Set adc max value to 6.144 V
 	chan = AnalogIn(ads, ADS.P0) # Create single-ended input on channel 0
 
@@ -485,7 +489,7 @@ def load_cell_zero():
 		load_cell_voltage.append(chan.voltage)
 
 	avg_voltage = sum(load_cell_voltage)/len(load_cell_voltage)
-	force_offset = 148.26*avg_voltage - 391.9
+	force_offset = 146.532248766305*avg_voltage - 391.181161611298
 	return force_offset
 	# return avg_voltage
 		
