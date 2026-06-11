@@ -146,8 +146,8 @@ def make_ls(sampling_freq,ls_type,operating_condition):
 					# application_interval[i] =  block_duration/((number_of_applications_per_block)*(2)*(1+ramp_size[i]))  
 
 			else:
-				ramp_size = (5/4)*np.zeros(len(force_levels)) # as a fraction of application interval 
-				application_interval = 1.0*np.zeros(len(force_levels)) # Pre set application interval in sec 
+				ramp_size = (5/4)*np.ones(len(force_levels)) # as a fraction of application interval 
+				application_interval = 1.0*np.ones(len(force_levels)) # Pre set application interval in sec  
 				
 			# Define Latin Squares
 			ls = {
@@ -206,11 +206,11 @@ def make_ls(sampling_freq,ls_type,operating_condition):
 					zero_hold = np.linspace(end_value,end_value,num = math.floor(sampling_freq*application_interval[current_square[i][j]]))
 					hold = np.linspace(force,force,num = math.floor(sampling_freq*application_interval[current_square[i][j]]))
 					if operating_condition == 'ramp_const':
-						ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval[current_square[i][j]]*ramp_size[current_square[i][j]]))
-						ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*application_interval[current_square[i][j]]*ramp_size[current_square[i][j]]))
+						ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*application_interval[current_square[i][j]]*ramp_time_scalar[current_square[i][j]]))
+						ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*application_interval[current_square[i][j]]*ramp_time_scalar[current_square[i][j]]))
 					else:
-						ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*ramp_time_scalar[current_square[i][j]]))
-						ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*ramp_time_scalar[current_square[i][j]]))
+						ramp_up = np.linspace(start_value,force,num = math.floor(sampling_freq*ramp_size[current_square[i][j]]))
+						ramp_down = np.linspace(force,end_value,num = math.floor(sampling_freq*ramp_size[current_square[i][j]]))
 					trajectory_cycle = np.concatenate((zero_hold,ramp_up,hold,ramp_down))
 					block = []
 					for _ in range(number_of_applications_per_block):
