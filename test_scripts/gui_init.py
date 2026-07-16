@@ -59,8 +59,12 @@ class InitGUI(tk.Tk):
         r += 1
 
         ttk.Label(cfg, text="Testing flag:").grid(row=r, column=0, sticky="W")
-        self.testing_flag_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(cfg, variable=self.testing_flag_var, text="testing_flag").grid(row=r, column=1, sticky="W")
+        self.testing_flag_var = tk.StringVar(value="off")
+        
+        testing_frame = ttk.Frame(cfg)
+        testing_frame.grid(row=r, column=1, sticky="W")
+        ttk.Radiobutton(testing_frame, text="on", variable=self.testing_flag_var, value="on").pack(side=tk.LEFT, padx=2)
+        ttk.Radiobutton(testing_frame, text="off", variable=self.testing_flag_var, value="off").pack(side=tk.LEFT, padx=2)
         r += 1
 
         ttk.Label(cfg, text="Traj type:").grid(row=r, column=0, sticky="W")
@@ -174,7 +178,7 @@ class InitGUI(tk.Tk):
 
         # 2) Initialize data saving variables (basic metadata)
         try:
-            testing_flag = bool(self.testing_flag_var.get())
+            testing_flag = self.testing_flag_var.get() == "on"
             test_time = 5.0
             name = self.name_var.get()
             date = self.date_var.get()
@@ -186,7 +190,7 @@ class InitGUI(tk.Tk):
             self.state['trial_name'] = trial_name
             self.state['file_save_path'] = file_save_path
             self.state['start_option'] = start_option
-            self.log_insert("Data variables initialized (testing_flag, file path, metadata)")
+            self.log_insert(f"Data variables initialized (testing_flag={testing_flag}, file path, metadata)")
         except Exception as e:
             self.log_insert(f"Data variables init failed: {e}")
 
