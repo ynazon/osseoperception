@@ -12,6 +12,7 @@ import traceback
 import time
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
+import os
 
 # numeric and signal processing
 import math
@@ -193,6 +194,29 @@ class InitGUI(tk.Tk):
             self.log_insert(f"Data variables initialized (testing_flag={testing_flag}, file path, metadata)")
         except Exception as e:
             self.log_insert(f"Data variables init failed: {e}")
+
+        # 2.5) Check if file save path is unique or already exists
+        try:
+            file_save_path = self.state.get('file_save_path')
+            save_location = self.state.get('file_save_path', '').rsplit('/', 1)[0] + '/'
+            
+            if file_save_path:
+                # Check if directory exists
+                if os.path.exists(save_location):
+                    self.log_insert(f"Save directory exists: {save_location}")
+                    
+                    # Check if file already exists
+                    if os.path.exists(file_save_path):
+                        self.log_insert(f"WARNING: File already exists: {file_save_path}")
+                    else:
+                        self.log_insert(f"File path is unique (directory exists but file is new): {file_save_path}")
+                else:
+                    self.log_insert(f"Save directory does not exist (will be created): {save_location}")
+                    self.log_insert(f"File path is unique (new directory): {file_save_path}")
+            else:
+                self.log_insert("File save path not set")
+        except Exception as e:
+            self.log_insert(f"File path uniqueness check failed: {e}")
 
         # 3) Control variables & arrays
         try:
