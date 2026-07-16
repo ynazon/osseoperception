@@ -243,14 +243,170 @@ class InitGUI(tk.Tk):
         except Exception as e:
             self.log_insert(f"Filter design failed: {e}")
 
+        # 6) Initialize Serial Port (if not simulating)
+        if not simulate:
+            try:
+                import serial
+                ser = serial.Serial(
+                    port='/dev/ttyAMA0',
+                    baudrate=115200,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                    bytesize=serial.EIGHTBITS,
+                    timeout=1
+                )
+                self.state['serial_port'] = ser
+                self.log_insert("Serial port initialized: /dev/ttyAMA0 @ 115200 baud")
+            except Exception as e:
+                self.log_insert(f"Serial port initialization failed: {e}")
+                self.state['serial_port'] = None
+        else:
+            self.log_insert("Serial port: skipped (simulate mode)")
+            self.state['serial_port'] = None
+
+        # 7) Initialize GPIO pins (if not simulating)
+        if not simulate:
+            try:
+                import gpiozero
+                # Start pin (input)
+                start_pin = 17  # Pin 11 is GPIO 17
+                input_pin = gpiozero.Button(start_pin, pull_up=False)
+                self.state['input_pin'] = input_pin
+                self.log_insert(f"Start pin initialized: GPIO {start_pin}")
+                
+                # Stop pin (output)
+                stop_pin = 27  # Pin 13 is GPIO 27
+                output_pin = gpiozero.LED(stop_pin)
+                output_pin.on()
+                self.state['output_pin'] = output_pin
+                self.log_insert(f"Stop pin initialized: GPIO {stop_pin}")
+            except Exception as e:
+                self.log_insert(f"GPIO pin initialization failed: {e}")
+                self.state['input_pin'] = None
+                self.state['output_pin'] = None
+        else:
+            self.log_insert("GPIO pins: skipped (simulate mode)")
+            self.state['input_pin'] = None
+            self.state['output_pin'] = None
+
+        # 8) Initialize ADC (if not simulating)
+        if not simulate:
+            try:
+                import busio
+                import adafruit_ads1x15.ads1115 as ADS
+                from adafruit_ads1x15.analog_in import AnalogIn
+                
+                # I2C pins
+                scl_pin = 3
+                sda_pin = 2
+                i2c = busio.I2C(scl_pin, sda_pin)
+                ads = ADS.ADS1115(i2c)
+                ads.gain = 2/3  # Set adc max value to 6.144 V
+                chan = AnalogIn(ads, ADS.P0)  # Create single-ended input on channel 0
+                
+                self.state['i2c'] = i2c
+                self.state['ads'] = ads
+                self.state['adc_channel'] = chan
+                self.log_insert("ADC initialized: ADS1115 on I2C (SCL=GPIO3, SDA=GPIO2), gain=2/3 V")
+            except Exception as e:
+                self.log_insert(f"ADC initialization failed: {e}")
+                self.state['i2c'] = None
+                self.state['ads'] = None
+                self.state['adc_channel'] = None
+        else:
+            self.log_insert("ADC: skipped (simulate mode)")
+            self.state['i2c'] = None
+            self.state['ads'] = None
+            self.state['adc_channel'] = None
+
+        # 9) Initialize PWM (if not simulating)
+        if not simulate:
+            try:
+                import gpiozero
+                
+                # Valve PWM
+                pwm_freq = 5000.0
+                valve_pwm_pin = 18
+                valve_pwm = gpiozero.PWMOutputDevice(valve_pwm_pin, active_high=True, initial_value=1.0, frequency=pwm_freq)
+                self.state['valve_pwm'] = valve_pwm
+                self.log_insert(f"Valve PWM initialized: GPIO {valve_pwm_pin} @ {pwm_freq}Hz")
+                
+                # Signal PWM
+                signal_pwm_freq = 1000.0
+                signal_pwm_pin = 13
+                signal_pwm = gpiozero.PWMOutputDevice(signal_pwm_pin, active_high=True, initial_value=0.0, frequency=signal_pwm_freq)
+                self.state['signal_pwm'] = signal_pwm
+                self.log_insert(f"Signal PWM initialized: GPIO {signal_pwm_pin} @ {signal_pwm_freq}Hz")
+            except Exception as e:
+                self.log_insert(f"PWM initialization failed: {e}")
+                self.state['valve_pwm'] = None
+                self.state['signal_pwm'] = None
+        else:
+            self.log_insert("PWM: skipped (simulate mode)")
+            self.state['valve_pwm'] = None
+            self.state['signal_pwm'] = None
+
         self.log_insert("Initialization complete. Objects stored in gui.state")
         self.log_insert("Ready to begin control loop (not implemented in GUI).")
 
     def test_adc(self):
-        self.log_insert("ADC test not available (hardware configuration removed).")
+        if self.state.get('adc_channel'):
+            try:
+                voltage = self.state['adc_channel'].voltage
+                self.log_insert(f"ADC test: read voltage = {voltage:.3f} V")
+            except Exception as e:
+                self.log_insert(f"ADC test failed: {e}")
+        else:
+            self.log_insert("ADC not initialized (simulate mode or initialization failed).")
 
     def cleanup(self):
-        self.log_insert("Cleanup complete (no hardware to close).")
+        """Clean up hardware resources"""
+        cleanup_msg = "Cleanup: "
+        
+        # Close serial port
+        if self.state.get('serial_port'):
+            try:
+                self.state['serial_port'].close()
+                cleanup_msg += "serial port closed; "
+            except:
+                pass
+        
+        # Close PWM devices
+        if self.state.get('valve_pwm'):
+            try:
+                self.state['valve_pwm'].value = 0.5
+                self.state['valve_pwm'].close()
+                cleanup_msg += "valve PWM closed; "
+            except:
+                pass
+        
+        if self.state.get('signal_pwm'):
+            try:
+                self.state['signal_pwm'].value = 0.0
+                self.state['signal_pwm'].close()
+                cleanup_msg += "signal PWM closed; "
+            except:
+                pass
+        
+        # Close GPIO pins
+        if self.state.get('output_pin'):
+            try:
+                self.state['output_pin'].close()
+                cleanup_msg += "output pin closed; "
+            except:
+                pass
+        
+        if self.state.get('input_pin'):
+            try:
+                self.state['input_pin'].close()
+                cleanup_msg += "input pin closed; "
+            except:
+                pass
+        
+        if cleanup_msg == "Cleanup: ":
+            cleanup_msg = "Cleanup: nothing to close (simulate mode or already cleaned)"
+        
+        self.log_insert(cleanup_msg)
 
 if __name__ == "__main__":
     app = InitGUI()
