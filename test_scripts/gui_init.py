@@ -194,6 +194,7 @@ class InitGUI(tk.Tk):
             self.log_insert(f"Data variables initialized (testing_flag={testing_flag}, file path, metadata)")
         except Exception as e:
             self.log_insert(f"Data variables init failed: {e}")
+            return
 
         # 2.5) Check if file save path is unique or already exists
         try:
@@ -208,6 +209,19 @@ class InitGUI(tk.Tk):
                     # Check if file already exists
                     if os.path.exists(file_save_path):
                         self.log_insert(f"WARNING: File already exists: {file_save_path}")
+                        
+                        # Ask user if they want to overwrite
+                        result = messagebox.askyesno(
+                            "File Already Exists",
+                            f"The file already exists:\n\n{file_save_path}\n\nDo you want to overwrite it?",
+                            parent=self
+                        )
+                        
+                        if result:
+                            self.log_insert("User chose to overwrite existing file. Continuing initialization...")
+                        else:
+                            self.log_insert("User chose NOT to overwrite. Initialization cancelled.")
+                            return
                     else:
                         self.log_insert(f"File path is unique (directory exists but file is new): {file_save_path}")
                 else:
@@ -215,8 +229,10 @@ class InitGUI(tk.Tk):
                     self.log_insert(f"File path is unique (new directory): {file_save_path}")
             else:
                 self.log_insert("File save path not set")
+                return
         except Exception as e:
             self.log_insert(f"File path uniqueness check failed: {e}")
+            return
 
         # 3) Control variables & arrays
         try:
