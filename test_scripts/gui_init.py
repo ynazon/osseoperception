@@ -229,7 +229,23 @@ class InitGUI(tk.Tk):
         except Exception as e:
             self.log_insert(f"Trajectory creation failed: {e}")
 
-        # 5) Create lowpass Butterworth filter and initial zi
+        # 5) Calculate and display trajectory execution time
+        try:
+            traj = self.state.get('traj')
+            sampling_freq = self.state.get('sampling_freq')
+            
+            if traj is not None and sampling_freq is not None:
+                traj_length = len(traj)
+                loop_dt = 1.0 / sampling_freq
+                trajectory_time = traj_length * loop_dt
+                self.log_insert(f"Trajectory execution time: {trajectory_time:.2f} seconds ({traj_length} samples @ {sampling_freq}Hz)")
+                self.state['trajectory_time'] = trajectory_time
+            else:
+                self.log_insert("Could not calculate trajectory time (traj or sampling_freq missing)")
+        except Exception as e:
+            self.log_insert(f"Trajectory time calculation failed: {e}")
+
+        # 6) Create lowpass Butterworth filter and initial zi
         try:
             fc = 20.0
             order = 2
@@ -243,7 +259,7 @@ class InitGUI(tk.Tk):
         except Exception as e:
             self.log_insert(f"Filter design failed: {e}")
 
-        # 6) Initialize Serial Port (if not simulating)
+        # 7) Initialize Serial Port (if not simulating)
         if not simulate:
             try:
                 import serial
@@ -264,7 +280,7 @@ class InitGUI(tk.Tk):
             self.log_insert("Serial port: skipped (simulate mode)")
             self.state['serial_port'] = None
 
-        # 7) Initialize GPIO pins (if not simulating)
+        # 8) Initialize GPIO pins (if not simulating)
         if not simulate:
             try:
                 import gpiozero
@@ -289,7 +305,7 @@ class InitGUI(tk.Tk):
             self.state['input_pin'] = None
             self.state['output_pin'] = None
 
-        # 8) Initialize ADC (if not simulating)
+        # 9) Initialize ADC (if not simulating)
         if not simulate:
             try:
                 import busio
@@ -319,7 +335,7 @@ class InitGUI(tk.Tk):
             self.state['ads'] = None
             self.state['adc_channel'] = None
 
-        # 9) Initialize PWM (if not simulating)
+        # 10) Initialize PWM (if not simulating)
         if not simulate:
             try:
                 import gpiozero
