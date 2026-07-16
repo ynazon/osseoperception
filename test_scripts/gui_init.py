@@ -53,11 +53,6 @@ class InitGUI(tk.Tk):
         ttk.Entry(cfg, textvariable=self.sampling_freq_var, width=10).grid(row=r, column=1, sticky="W")
         r += 1
 
-        ttk.Label(cfg, text="Desired force (N):").grid(row=r, column=0, sticky="W")
-        self.desired_force_var = tk.DoubleVar(value=7.0)
-        ttk.Entry(cfg, textvariable=self.desired_force_var, width=10).grid(row=r, column=1, sticky="W")
-        r += 1
-
         ttk.Label(cfg, text="Testing flag:").grid(row=r, column=0, sticky="W")
         self.testing_flag_var = tk.StringVar(value="off")
         
@@ -65,6 +60,11 @@ class InitGUI(tk.Tk):
         testing_frame.grid(row=r, column=1, sticky="W")
         ttk.Radiobutton(testing_frame, text="on", variable=self.testing_flag_var, value="on").pack(side=tk.LEFT, padx=2)
         ttk.Radiobutton(testing_frame, text="off", variable=self.testing_flag_var, value="off").pack(side=tk.LEFT, padx=2)
+        r += 1
+
+        ttk.Label(cfg, text="Desired force for testing (N):").grid(row=r, column=0, sticky="W")
+        self.desired_force_var = tk.DoubleVar(value=7.0)
+        ttk.Entry(cfg, textvariable=self.desired_force_var, width=10).grid(row=r, column=1, sticky="W")
         r += 1
 
         ttk.Label(cfg, text="Traj type:").grid(row=r, column=0, sticky="W")
@@ -98,7 +98,7 @@ class InitGUI(tk.Tk):
         ttk.Label(cfg, text="Start Options:", font=("TkDefaultFont", 10, "bold")).grid(row=r, column=0, columnspan=2, sticky="W")
         r += 1
 
-        self.start_option_var = tk.StringVar(value="Auto")
+        self.start_option_var = tk.StringVar(value="MRI/Key")
         
         options = [
             ("Serial", "Serial"),
