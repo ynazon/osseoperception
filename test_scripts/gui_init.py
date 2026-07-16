@@ -87,6 +87,26 @@ class InitGUI(tk.Tk):
         ttk.Checkbutton(cfg, variable=self.simulate_var, text="Simulate (no hardware)").grid(row=r, column=0, columnspan=2, sticky="W")
         r += 1
 
+        # Start Options section
+        ttk.Separator(cfg, orient="horizontal").grid(row=r, column=0, columnspan=2, sticky="EW", pady=(8, 8))
+        r += 1
+
+        ttk.Label(cfg, text="Start Options:", font=("TkDefaultFont", 10, "bold")).grid(row=r, column=0, columnspan=2, sticky="W")
+        r += 1
+
+        self.start_option_var = tk.StringVar(value="Auto")
+        
+        options = [
+            ("Serial", "Serial"),
+            ("MRI/Key", "MRI/Key"),
+            ("User", "User"),
+            ("Auto", "Auto")
+        ]
+        
+        for label, value in options:
+            ttk.Radiobutton(cfg, text=label, variable=self.start_option_var, value=value).grid(row=r, column=0, columnspan=2, sticky="W", padx=(20, 0))
+            r += 1
+
         # Buttons
         btn_frame = ttk.Frame(cfg)
         btn_frame.grid(row=r, column=0, columnspan=2, pady=(8,0))
@@ -118,6 +138,8 @@ class InitGUI(tk.Tk):
     def initialize_all(self):
         self.log_insert("Initialization started...")
         simulate = self.simulate_var.get()
+        start_option = self.start_option_var.get()
+        self.log_insert(f"Start option selected: {start_option}")
 
         # 1) rtplot client initialize plots (if available)
         try:
@@ -163,6 +185,7 @@ class InitGUI(tk.Tk):
             self.state['test_time'] = test_time
             self.state['trial_name'] = trial_name
             self.state['file_save_path'] = file_save_path
+            self.state['start_option'] = start_option
             self.log_insert("Data variables initialized (testing_flag, file path, metadata)")
         except Exception as e:
             self.log_insert(f"Data variables init failed: {e}")
