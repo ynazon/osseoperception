@@ -32,7 +32,7 @@ import importlib
 class InitGUI(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("OSSE Perception - Initialization GUI")
+        self.title("Osseoperception - Initialization GUI")
         self.geometry("820x620")
         self.resizable(False, False)
 
