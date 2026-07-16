@@ -17,7 +17,7 @@ import os
 # numeric and signal processing
 import math
 import numpy as np
-from scipy.signal import butter, lfilter_zi
+from scipy.signal import butter, lfilter, lfilter_zi
 
 # Try to import repo utilities (robot_fxns)
 try:
@@ -38,6 +38,8 @@ class InitGUI(tk.Tk):
         self.resizable(False, False)
 
         self.state = {}  # will hold initialized objects
+        self.initialization_complete = False
+        self.control_loop_running = False
         self.create_widgets()
 
     def create_widgets(self):
@@ -116,7 +118,8 @@ class InitGUI(tk.Tk):
         btn_frame = ttk.Frame(cfg)
         btn_frame.grid(row=r, column=0, columnspan=2, pady=(8,0))
         ttk.Button(btn_frame, text="Initialize", command=self.start_initialize).grid(row=0, column=0, padx=4)
-        ttk.Button(btn_frame, text="Test ADC read", command=self.test_adc).grid(row=0, column=1, padx=4)
+        self.run_button = ttk.Button(btn_frame, text="Run", command=self.start_control_loop, state=tk.DISABLED)
+        self.run_button.grid(row=0, column=1, padx=4)
         ttk.Button(btn_frame, text="Cleanup", command=self.cleanup).grid(row=0, column=2, padx=4)
         r += 1
 
@@ -137,6 +140,8 @@ class InitGUI(tk.Tk):
 
     def start_initialize(self):
         # Run initialization in a background thread to avoid blocking the UI
+        self.initialization_complete = False
+        self.run_button.config(state=tk.DISABLED)
         t = threading.Thread(target=self.initialize_all, daemon=True)
         t.start()
 
@@ -304,6 +309,7 @@ class InitGUI(tk.Tk):
             self.log_insert(f"Filter design failed: {e}")
 
         # 7) Initialize Serial Port (if not simulating)
+        simulate = self.simulate_var.get()
         if not simulate:
             try:
                 import serial
@@ -407,20 +413,192 @@ class InitGUI(tk.Tk):
             self.state['signal_pwm'] = None
 
         self.log_insert("Initialization complete. Objects stored in gui.state")
-        self.log_insert("Ready to begin control loop (not implemented in GUI).")
+        
+        # Enable the Run button now that initialization is complete
+        self.initialization_complete = True
+        self.run_button.config(state=tk.NORMAL)
+        self.log_insert("Ready to run control loop. Click 'Run' to start.")
 
-    def test_adc(self):
-        if self.state.get('adc_channel'):
+    def start_control_loop(self):
+        """Start the control loop in a background thread"""
+        if not self.initialization_complete:
+            messagebox.showerror("Error", "Initialization must complete first. Click 'Initialize' button.")
+            return
+        
+        self.control_loop_running = True
+        self.run_button.config(state=tk.DISABLED)
+        t = threading.Thread(target=self.run_control_loop, daemon=True)
+        t.start()
+
+    def run_control_loop(self):
+        """Main control loop - mirrors the logic from control_test.py"""
+        try:
+            self.log_insert("Control loop started...")
+            
+            # Get state variables
+            testing_flag = self.state.get('testing_flag', False)
+            traj = self.state.get('traj')
+            sampling_freq = self.state.get('sampling_freq')
+            loop_dt = self.state.get('loop_dt')
+            desired_force = self.state.get('desired_force')
+            b = self.state.get('filter_b')
+            a = self.state.get('filter_a')
+            zi = self.state.get('filter_zi')
+            chan = self.state.get('adc_channel')
+            valve_pwm = self.state.get('valve_pwm')
+            client = self.state.get('rtplot_client')
+            
+            if not all([traj is not None, sampling_freq, loop_dt, b is not None, a is not None, zi is not None]):
+                self.log_insert("Control loop error: missing required state variables")
+                return
+            
+            # Initialize control variables
+            iterations = 0
+            previous_error = 0.0
+            error_sum = 0.0
+            error_derivative = 0.0
+            differentiation_points = [0.0, 0.0, 0.0, 0.0]
+            
+            # Get load cell offset (if available)
             try:
-                voltage = self.state['adc_channel'].voltage
-                self.log_insert(f"ADC test: read voltage = {voltage:.3f} V")
+                if robot is not None:
+                    force_offset = robot.load_cell_zero()
+                else:
+                    force_offset = 0.0
+                self.log_insert(f"Load cell offset: {force_offset}")
             except Exception as e:
-                self.log_insert(f"ADC test failed: {e}")
-        else:
-            self.log_insert("ADC not initialized (simulate mode or initialization failed).")
+                force_offset = 0.0
+                self.log_insert(f"Could not get load cell offset: {e}")
+            
+            t_init = time.time()
+            test_time = self.state.get('test_time', 5.0)
+            
+            if testing_flag:
+                # Testing mode: run for fixed time
+                self.log_insert(f"Running in testing mode for {test_time} seconds...")
+                traj = []
+                max_traj_value = desired_force
+                
+                while (time.time() - t_init < test_time) and self.control_loop_running:
+                    t1 = time.time()
+                    
+                    try:
+                        if chan is not None:
+                            voltage = chan.voltage
+                        else:
+                            voltage = 0.0
+                        
+                        filtered_voltage, zi = robot.realtime_lowpass_filter(voltage, b, a, zi)
+                        raw_force = (146.532248766305 * (voltage) - 391.181161611298)
+                        filtered_measured_force = (146.532248766305 * (filtered_voltage) - 391.181161611298)
+                        
+                        # Get control effort
+                        [control_effort, previous_error, kp, ki, kd, kp_term, ki_term, kd_term,
+                         error_sum, error_derivative, differentiation_points] = robot.PID_control(
+                            desired_force, filtered_measured_force, previous_error,
+                            error_sum, error_derivative, differentiation_points, loop_dt)
+                        
+                        if valve_pwm is not None:
+                            valve_pwm.value = control_effort + 0.5
+                        
+                        iterations += 1
+                        
+                        # Append data for saving
+                        self.state['desired_force_vector'].append(desired_force)
+                        self.state['raw_force_vector'].append(raw_force)
+                        self.state['voltage_vector'].append(voltage)
+                        self.state['control_effort_vector'].append(control_effort)
+                        self.state['filtered_voltage_vector'].append(filtered_voltage)
+                        self.state['time_loop_start'].append(t1 - t_init)
+                        self.state['filtered_measured_force_vector'].append(filtered_measured_force)
+                        traj.append(desired_force)
+                        
+                        # Send to plot
+                        if client is not None:
+                            try:
+                                client.send_array([filtered_measured_force, desired_force])
+                            except:
+                                pass
+                        
+                        # Maintain sampling rate
+                        while (time.time() - t1 < loop_dt) and self.control_loop_running:
+                            time.sleep(0.0001)
+                    
+                    except Exception as e:
+                        self.log_insert(f"Error in control loop: {e}")
+                        break
+            
+            else:
+                # Normal mode: follow trajectory
+                self.log_insert("Running in normal mode, following trajectory...")
+                max_traj_value = max(traj) if len(traj) > 0 else desired_force
+                
+                for desired_force_point in traj:
+                    if not self.control_loop_running:
+                        break
+                    
+                    t1 = time.time()
+                    
+                    try:
+                        if chan is not None:
+                            voltage = chan.voltage
+                        else:
+                            voltage = 0.0
+                        
+                        filtered_voltage, zi = robot.realtime_lowpass_filter(voltage, b, a, zi)
+                        raw_force = (146.532248766305 * (voltage) - 391.181161611298)
+                        filtered_measured_force = (146.532248766305 * (filtered_voltage) - 391.181161611298)
+                        
+                        # Get control effort
+                        [control_effort, previous_error, kp, ki, kd, kp_term, ki_term, kd_term,
+                         error_sum, error_derivative, differentiation_points] = robot.PID_control(
+                            desired_force_point, filtered_measured_force, previous_error,
+                            error_sum, error_derivative, differentiation_points, loop_dt)
+                        
+                        if valve_pwm is not None:
+                            valve_pwm.value = control_effort + 0.5
+                        
+                        iterations += 1
+                        
+                        # Append data for saving
+                        self.state['desired_force_vector'].append(desired_force_point)
+                        self.state['raw_force_vector'].append(raw_force)
+                        self.state['voltage_vector'].append(voltage)
+                        self.state['control_effort_vector'].append(control_effort)
+                        self.state['filtered_voltage_vector'].append(filtered_voltage)
+                        self.state['time_loop_start'].append(t1 - t_init)
+                        self.state['filtered_measured_force_vector'].append(filtered_measured_force)
+                        
+                        # Send to plot
+                        if client is not None:
+                            try:
+                                client.send_array([desired_force_point, filtered_measured_force])
+                            except:
+                                pass
+                        
+                        # Maintain sampling rate
+                        while (time.time() - t1 < loop_dt) and self.control_loop_running:
+                            time.sleep(0.0001)
+                    
+                    except Exception as e:
+                        self.log_insert(f"Error in control loop: {e}")
+                        break
+            
+            self.log_insert(f"Control loop completed. Total iterations: {iterations}")
+            self.log_insert(f"Run time: {time.time() - t_init:.2f} seconds")
+            
+        except Exception as e:
+            self.log_insert(f"Control loop error: {e}")
+            traceback.print_exc()
+        
+        finally:
+            self.control_loop_running = False
+            self.run_button.config(state=tk.NORMAL)
+            self.log_insert("Control loop stopped.")
 
     def cleanup(self):
         """Clean up hardware resources"""
+        self.control_loop_running = False
         cleanup_msg = "Cleanup: "
         
         # Close serial port
@@ -467,6 +645,8 @@ class InitGUI(tk.Tk):
             cleanup_msg = "Cleanup: nothing to close (simulate mode or already cleaned)"
         
         self.log_insert(cleanup_msg)
+        self.initialization_complete = False
+        self.run_button.config(state=tk.DISABLED)
 
 if __name__ == "__main__":
     app = InitGUI()
